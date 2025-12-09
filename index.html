@@ -1448,7 +1448,7 @@
         })
         .filter(Boolean)
         .filter(item => {
-          const limite = indiceMesNombre('noviembre');
+          const limite = indiceMesNombre('diciembre');
           return typeof limite === 'number' ? item.mesNumero <= limite : true;
         })
         .sort((a, b) => {
