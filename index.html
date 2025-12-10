@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Panel Operativo - Saav Rent a Car</title>
+  
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  
+  <style>
+    /* Estilos Barra Progreso */
+    .progress-container {
+      width: 100%;
+      height: 10px;
+      background-color: rgba(255, 255, 255, 0.1);
+      border-radius: 999px;
+      margin: 10px 0;
+      overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #4ade80, #22c55e);
+      width: 0%;
+      transition: width 1s ease;
+      border-radius: 999px;
+    }
+    .progress-info {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      color: rgba(255, 255, 255, 0.7);
+    }
+    
+    /* Estilos Calendario Lista */
+    .calendar-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .calendar-item {
+      padding: 10px 14px;
+      border-radius: 8px;
+      background: rgba(43, 45, 66, 0.03);
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 0.9rem;
+      color: var(--secondary);
+      transition: all 0.2s;
+    }
+    .calendar-item:hover {
+      background: rgba(43, 45, 66, 0.08);
+    }
+    .calendar-item.selected {
+      background: var(--primary);
+      color: white;
+      font-weight: 600;
+    }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script type="module" src="main.js"></script>
+</head>
+<body>
+  
+  <div id="loader" class="loader-container">
+    <div class="spinner"></div>
+    <p>Cargando sistema...</p>
+  </div>
+
+  <section class="hero" id="inicio">
+    <div class="hero-content">
+      <img src="logo.png" alt="Saav Rent a Car" class="hero-logo" onerror="this.style.display='none'"/>
+      <h1>Panel Operativo (Ingresos + Cobranzas)</h1>
+      <div class="hero-actions">
+        <a class="btn-primary" href="#cuenta-ingresos">Ingresos</a>
+        <a class="btn-primary" href="#cuentas-cobrar">Cuentas por Cobrar</a>
+      </div>
+    </div>
+  </section>
+
+  <main id="analitica">
+    <div id="error-message" class="error-banner is-hidden"><p></p></div>
+
+    <div class="content-wrapper ingresos-section" id="cuenta-ingresos">
+      <div class="section-header">
+        <div class="section-intro">
+          <h2>Cuenta de ingresos</h2>
+          <p>Resumen mensual de facturación y flota.</p>
+        </div>
+        <div class="ingresos-filtros">
+          <label><span>Mes</span><select id="filtro-mes-ingresos"></select></label>
+        </div>
+      </div>
+
+      <section class="ingresos-panel">
+        <article class="card ingresos-card">
+          <h3>Ingresos anuales (Bs)</h3>
+          <div class="value" id="ingresos-total-anio">Bs 0</div>
+          <small id="ingresos-total-anio-detalle">Acumulado anual</small>
+        </article>
+        <article class="card ingresos-card">
+          <h3>Ingresos anuales (USD)</h3>
+          <div class="value" id="ingresos-total-anio-usd">$0</div>
+          <small id="ingresos-total-anio-usd-detalle">Equivalente USD</small>
+        </article>
+        <article class="card ingresos-card">
+          <h3>Ingresos del mes (Bs) <span class="month-badge" id="ingresos-mes-actual">—</span></h3>
+          <div class="value" id="ingresos-mensual-bs">Bs 0</div>
+          <small id="ingresos-mensual-bs-detalle">Facturación mes</small>
+        </article>
+        <article class="card ingresos-card">
+          <h3>Ingresos del mes (USD)</h3>
+          <div class="value" id="ingresos-mensual-usd">$0</div>
+          <small id="ingresos-mensual-usd-detalle">Facturación mes</small>
+        </article>
+        <article class="card ingresos-card">
+          <h3>Variación mensual</h3>
+          <div class="value" id="ingresos-variacion">0%</div>
+          <small id="ingresos-variacion-detalle">vs mes anterior</small>
+        </article>
+        <article class="card ingresos-card">
+          <h3>Flota en uso</h3>
+          <div class="value" id="ingresos-flota">0 uds</div>
+          <small id="ingresos-flota-detalle">Detalle</small>
+        </article>
+        <article class="card ingresos-card">
+          <h3>Ingreso por unidad</h3>
+          <div class="value" id="ingreso-por-unidad">Bs 0</div>
+          <small id="ingreso-por-unidad-detalle">Promedio</small>
+        </article>
+        
+        <article class="card ingresos-card">
+          <h3>Cierre de Mes</h3>
+          <div class="progress-container">
+            <div id="progress-bar-fill" class="progress-bar"></div>
+          </div>
+          <div class="progress-info">
+            <span id="progress-text">Día 0 de 30</span>
+            <strong id="days-left-text" style="color: #fff;">Calculando...</strong>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel ingresos-chart-panel">
+        <h3>Histórico Ingresos vs Flota</h3>
+        <div class="chart-container"><canvas id="chart-ingresos" height="240"></canvas></div>
+      </section>
+    </div>
+
+    <div class="content-wrapper">
+      <div class="section-header" id="cuentas-cobrar">
+        <div class="section-intro">
+          <h2>Cuentas por Cobrar</h2>
+          <p>Estado de cartera y pagos recientes.</p>
+        </div>
+        <div class="date-controls">
+          <span class="date-pill">Datos al: <strong id="fecha-actual">—</strong></span>
+          <div class="date-picker">
+            <span>Fecha Reporte</span>
+            <div class="calendar-wrapper">
+              <button type="button" class="calendar-toggle" id="calendario-toggle">
+                <span id="calendario-label">Seleccionar</span>
+              </button>
+              <div class="calendar-dropdown" id="calendario-dropdown"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <section class="cards">
+        <article class="card">
+          <h3>Total por Cobrar (USD)</h3>
+          <div class="value" id="total-usd">$0</div>
+        </article>
+        <article class="card">
+          <h3>Total por Cobrar (Bs)</h3>
+          <div class="value" id="total-bs">Bs 0</div>
+        </article>
+        <article class="card">
+          <h3>Clientes Activos</h3>
+          <div class="value" id="clientes-activos">0</div>
+        </article>
+        <article class="card">
+          <h3>Mes Mayor Deuda</h3>
+          <div class="value" id="mes-top">—</div>
+        </article>
+        <article class="card">
+          <h3>Tipo de Cambio</h3>
+          <div class="value" id="tipo-cambio">6,96 Bs</div>
+        </article>
+        <article class="card">
+          <h3>% Cobrado (Mes)</h3>
+          <div class="value" id="porcentaje-cobrado">0%</div>
+        </article>
+        <article class="card">
+          <h3>Monto Cobrado (Mes)</h3>
+          <div class="value" id="monto-cobrado">Bs 0</div>
+        </article>
+        
+        <article class="card card-list">
+          <h3>Retiros del último mes</h3>
+          <ul class="kpi-list" id="empresas-salieron"><li class="empty">Calculando...</li></ul>
+          <small>Pagos identificados respecto al corte anterior.</small>
+        </article>
+
+        <article class="card card-list pareto-card">
+          <h3>Pareto 80/20</h3>
+          <div class="pareto-toggle">
+            <button class="active" data-pareto="80">Top 80%</button>
+            <button data-pareto="20">20%</button>
+          </div>
+          <ul class="kpi-list" id="pareto-list"><li class="empty">...</li></ul>
+        </article>
+      </section>
+
+      <section class="panels">
+        <article class="panel chart-panel">
+          <h3>Evolución Deuda (Bs)</h3>
+          <div class="chart-container"><canvas id="chart-mensual" height="240"></canvas></div>
+        </article>
+        <article class="panel chart-panel">
+          <h3>Por Locación</h3>
+          <div class="chart-container"><canvas id="chart-locacion" height="240"></canvas></div>
+        </article>
+      </section>
+
+      <section class="panel client-panel">
+        <div class="client-header">
+          <h3>Detalle Cliente</h3>
+          <div class="client-controls">
+            <select id="filtro-cliente"><option value="">Seleccionar...</option></select>
+            <button class="chart-toggle" id="btn-deuda-mensual">Ver Gráfico</button>
+          </div>
+        </div>
+        <div class="client-insights">
+          <div class="client-card"><span>Cliente</span><strong id="cliente-nombre">—</strong></div>
+          <div class="client-card"><span>Saldo (Bs)</span><strong id="cliente-total-bs">Bs 0</strong></div>
+          <div class="client-card"><span>Saldo (USD)</span><strong id="cliente-total-usd">$0</strong></div>
+        </div>
+        <div class="chart-container"><canvas id="chart-cliente" class="is-hidden" height="260"></canvas></div>
+      </section>
+
+      <section class="panel">
+        <div class="filters">
+          <label>Mes <select id="filtro-mes"></select></label>
+          <label>Locación <select id="filtro-locacion"></select></label>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>Fecha</th><th>Mes Deuda</th><th>Locación</th><th>Cliente</th><th>USD</th><th>Bs</th></tr></thead>
+            <tbody id="tabla-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </main>
+  <footer>© 2025 Saav Rent a Car</footer>
+</body>
+</html>
