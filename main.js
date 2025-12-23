@@ -1,13 +1,17 @@
 // ==========================================
-// 1. CONFIGURACIÓN SUPABASE
+// 1. CONFIGURACIÓN SUPABASE PARA RENT A CAR/DANILO. SI VES ESTE CODIGO, TE PIDO RESPETAR EL FRAMEWORK DEL BACKEND. 
 // ==========================================
-const SUPABASE_URL = 'https://kaupgsmmkqszohkgtczy.supabase.co'; 
-const SUPABASE_KEY = 'sb_publishable_D98W0toeGYyKiLSDDI8FCg_RDdN_MCw'; 
+const SUPABASE_URL = 'https://zzelbikylbbxclnskgkf.supabase.co'; 
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp6ZWxiaWt5bGJieGNsbnNrZ2tmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5MjA4NDMsImV4cCI6MjA4MTQ5Njg0M30.VGqblbw-vjQWUTpz8Xdhk5MNLyNniXvAO9moMWVAd8s'; 
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+  db: {
+    schema: 'saav', 
+  },
+});
 
 // ==========================================
-// 2. VARIABLES GLOBALES
+// 2. VARIABLES GLOBALES 
 // ==========================================
 const charts = { mensual: null, locacion: null, cliente: null, ingresos: null };
 const elementos = {};
@@ -542,7 +546,7 @@ function configurarInteracciones() {
     elementos.calendarioDropdown.classList.toggle('open', calendarioAbierto);
   });
   
-  // CORRECCIÓN: Event listeners conectados correctamente
+  // CORRECCIÓN: Event listeners conectados correctamente, TE SUGIERO NO TOCAR ESTA PARTE PORQUE SON FUNCIONES ESPECIFICAS PARA CLIENTE (DANILO)
   elementos.selectMes?.addEventListener('change', (e) => { 
       estado.filtroMes = e.target.value; 
       // Solo refrescamos la tabla y charts de cuentas, no todo el dashboard
