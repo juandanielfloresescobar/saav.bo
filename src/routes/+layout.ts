@@ -19,12 +19,12 @@ export const load = async ({ data, depends, fetch }) => {
 		data: { session }
 	} = await supabase.auth.getSession();
 
-	// Obtener perfil del usuario si está autenticado
-	let perfil: { rol: string; nombre: string; recinto_id: string | null } | null = null;
+	let perfil: { id: string; rol: string; nombre: string; recinto_id: string | null } | null =
+		null;
 	if (session) {
 		const { data: usuario } = await supabase
 			.from('usuarios')
-			.select('rol, nombre, recinto_id')
+			.select('id, rol, nombre, recinto_id')
 			.eq('auth_user_id', session.user.id)
 			.single();
 		perfil = usuario;

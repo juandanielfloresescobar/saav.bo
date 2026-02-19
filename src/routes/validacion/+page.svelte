@@ -84,53 +84,29 @@
 		await Promise.all([loadActas(), loadCounts()]);
 		loading = false;
 	}
+
+	const estadoConfig: Record<string, { label: string; color: string }> = {
+		pendiente: { label: 'Pendientes', color: 'primary' },
+		verificada: { label: 'Verificadas', color: 'success' },
+		observada: { label: 'Observadas', color: 'warning' },
+		rechazada: { label: 'Rechazadas', color: 'danger' }
+	};
 </script>
 
 <svelte:head>
-	<title>Quantis - Validación de Actas</title>
+	<title>Quantis - Validacion de Actas</title>
 </svelte:head>
 
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-	<h1 class="text-xl font-bold text-gray-900 mb-6">Validación de Actas</h1>
-
-	<!-- Contadores -->
-	<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-		<button
-			onclick={() => { filtroEstado = 'pendiente'; loadActas(); }}
-			class="bg-white rounded-xl border p-4 text-left transition-colors {filtroEstado === 'pendiente' ? 'border-primary-500 ring-1 ring-primary-500' : 'border-gray-200'}"
-		>
-			<p class="text-2xl font-bold text-gray-900">{counts.pendiente}</p>
-			<p class="text-xs text-gray-500">Pendientes</p>
-		</button>
-		<button
-			onclick={() => { filtroEstado = 'verificada'; loadActas(); }}
-			class="bg-white rounded-xl border p-4 text-left transition-colors {filtroEstado === 'verificada' ? 'border-success-500 ring-1 ring-success-500' : 'border-gray-200'}"
-		>
-			<p class="text-2xl font-bold text-success-600">{counts.verificada}</p>
-			<p class="text-xs text-gray-500">Verificadas</p>
-		</button>
-		<button
-			onclick={() => { filtroEstado = 'observada'; loadActas(); }}
-			class="bg-white rounded-xl border p-4 text-left transition-colors {filtroEstado === 'observada' ? 'border-warning-500 ring-1 ring-warning-500' : 'border-gray-200'}"
-		>
-			<p class="text-2xl font-bold text-warning-600">{counts.observada}</p>
-			<p class="text-xs text-gray-500">Observadas</p>
-		</button>
-		<button
-			onclick={() => { filtroEstado = 'rechazada'; loadActas(); }}
-			class="bg-white rounded-xl border p-4 text-left transition-colors {filtroEstado === 'rechazada' ? 'border-danger-500 ring-1 ring-danger-500' : 'border-gray-200'}"
-		>
-			<p class="text-2xl font-bold text-danger-600">{counts.rechazada}</p>
-			<p class="text-xs text-gray-500">Rechazadas</p>
-		</button>
-	</div>
-
-	<!-- Filtro distrito -->
-	<div class="mb-4">
+	<div class="flex items-center justify-between mb-6">
+		<div>
+			<h1 class="text-lg font-bold text-gray-900">Validacion de Actas</h1>
+			<p class="text-xs text-gray-400 mt-0.5">Verifica las actas cargadas por delegados</p>
+		</div>
 		<select
 			bind:value={filtroDistrito}
 			onchange={() => loadActas()}
-			class="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
+			class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
 		>
 			<option value="">Todos los distritos</option>
 			{#each distritos as d}
@@ -139,57 +115,68 @@
 		</select>
 	</div>
 
+	<!-- Contadores -->
+	<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+		{#each ['pendiente', 'verificada', 'observada', 'rechazada'] as estado}
+			{@const active = filtroEstado === estado}
+			<button
+				onclick={() => { filtroEstado = estado; loadActas(); }}
+				class="bg-white rounded-xl border p-4 text-left transition-all shadow-sm
+					{active ? 'border-primary-500 ring-1 ring-primary-200' : 'border-gray-100 hover:border-gray-200'}"
+			>
+				<p class="text-2xl font-bold {estado === 'verificada' ? 'text-success-600' : estado === 'observada' ? 'text-warning-600' : estado === 'rechazada' ? 'text-danger-600' : 'text-gray-900'}">
+					{counts[estado]}
+				</p>
+				<p class="text-xs text-gray-400 mt-0.5">{estadoConfig[estado].label}</p>
+			</button>
+		{/each}
+	</div>
+
 	<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 		<!-- Lista de actas -->
 		<div class="space-y-2">
 			{#if loading && !selectedActa}
 				<div class="text-center py-12 text-gray-400 text-sm">Cargando actas...</div>
 			{:else if actas.length === 0}
-				<div class="text-center py-12 text-gray-400 text-sm">
-					No hay actas con estado "{filtroEstado}"
+				<div class="text-center py-12">
+					<svg class="w-10 h-10 text-gray-200 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+					</svg>
+					<p class="text-sm text-gray-400">No hay actas {filtroEstado === 'pendiente' ? 'pendientes' : 'con estado "' + filtroEstado + '"'}</p>
 				</div>
 			{:else}
 				{#each actas as acta}
 					<button
 						onclick={() => selectActa(acta)}
-						class="w-full text-left bg-white rounded-lg border p-4 hover:border-primary-300 transition-colors {selectedActa?.id === acta.id ? 'border-primary-500 ring-1 ring-primary-500' : 'border-gray-200'}"
+						class="w-full text-left bg-white rounded-lg border p-4 transition-all shadow-sm
+							{selectedActa?.id === acta.id ? 'border-primary-500 ring-1 ring-primary-200' : 'border-gray-100 hover:border-gray-200'}"
 					>
 						<div class="flex items-center justify-between mb-1">
-							<span class="text-sm font-medium text-gray-900">
-								Mesa {acta.mesas?.numero}
-							</span>
+							<span class="text-sm font-semibold text-gray-900">Mesa {acta.mesas?.numero}</span>
 							<span class="text-xs text-gray-400">
-								{new Date(acta.created_at).toLocaleString('es-BO', {
-									hour: '2-digit',
-									minute: '2-digit'
-								})}
+								{new Date(acta.created_at).toLocaleString('es-BO', { hour: '2-digit', minute: '2-digit' })}
 							</span>
 						</div>
-						<p class="text-xs text-gray-500">
-							{acta.mesas?.recintos?.nombre} — D{acta.mesas?.recintos?.distritos?.numero}
-						</p>
-						<p class="text-xs text-gray-400 mt-0.5">
-							Delegado: {acta.usuarios?.nombre}
-						</p>
+						<p class="text-xs text-gray-500">{acta.mesas?.recintos?.nombre} — D{acta.mesas?.recintos?.distritos?.numero}</p>
+						<p class="text-xs text-gray-400 mt-0.5">Delegado: {acta.usuarios?.nombre}</p>
 					</button>
 				{/each}
 			{/if}
 		</div>
 
-		<!-- Panel de verificación -->
+		<!-- Panel de verificacion -->
 		{#if selectedActa}
-			<div class="bg-white rounded-xl border border-gray-200 p-5 sticky top-20">
+			<div class="bg-white rounded-xl border border-gray-100 p-5 sticky top-20 shadow-sm">
 				<h3 class="text-sm font-semibold text-gray-900 mb-4">
-					Verificar Acta — Mesa {selectedActa.mesas?.numero}
+					Verificar — Mesa {selectedActa.mesas?.numero}
 				</h3>
 
-				<!-- Foto del acta -->
 				{#if selectedActa.foto_url}
 					<div class="mb-4">
 						<img
 							src={selectedActa.foto_url}
 							alt="Acta electoral"
-							class="w-full rounded-lg border border-gray-200 cursor-zoom-in"
+							class="w-full rounded-lg cursor-zoom-in"
 						/>
 					</div>
 				{:else}
@@ -198,80 +185,76 @@
 					</div>
 				{/if}
 
-				<!-- Datos ingresados -->
 				<div class="space-y-2 mb-4">
-					<h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-						Datos Ingresados
-					</h4>
+					<h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Datos</h4>
 					{#each votosActa as voto}
 						<div class="flex items-center justify-between text-sm">
 							<div class="flex items-center gap-2">
-								<span
-									class="w-2.5 h-2.5 rounded-full"
-									style="background-color: {voto.partidos?.color}"
-								></span>
-								<span class="text-gray-700">{voto.partidos?.sigla}</span>
+								<span class="w-2 h-2 rounded-full" style="background-color: {voto.partidos?.color}"></span>
+								<span class="text-gray-600">{voto.partidos?.sigla}</span>
 							</div>
-							<span class="font-medium text-gray-900">{voto.cantidad}</span>
+							<span class="font-semibold text-gray-900 tabular-nums">{voto.cantidad}</span>
 						</div>
 					{/each}
-					<hr class="border-gray-100" />
-					<div class="flex justify-between text-sm">
-						<span class="text-gray-500">Nulos</span>
-						<span class="text-gray-700">{selectedActa.votos_nulos}</span>
-					</div>
-					<div class="flex justify-between text-sm">
-						<span class="text-gray-500">Blancos</span>
-						<span class="text-gray-700">{selectedActa.votos_blancos}</span>
-					</div>
-					<div class="flex justify-between text-sm font-semibold">
-						<span class="text-gray-900">Total</span>
-						<span class="text-gray-900">{selectedActa.total_votantes}</span>
+					<div class="border-t border-gray-100 pt-2 space-y-1.5">
+						<div class="flex justify-between text-sm">
+							<span class="text-gray-400">Nulos</span>
+							<span class="text-gray-600 tabular-nums">{selectedActa.votos_nulos}</span>
+						</div>
+						<div class="flex justify-between text-sm">
+							<span class="text-gray-400">Blancos</span>
+							<span class="text-gray-600 tabular-nums">{selectedActa.votos_blancos}</span>
+						</div>
+						<div class="flex justify-between text-sm font-semibold">
+							<span class="text-gray-900">Total</span>
+							<span class="text-gray-900 tabular-nums">{selectedActa.total_votantes}</span>
+						</div>
 					</div>
 				</div>
 
-				<!-- Observaciones -->
 				<div class="mb-4">
-					<label for="obs" class="block text-xs font-medium text-gray-500 mb-1">
-						Observaciones
-					</label>
+					<label for="obs" class="block text-xs font-medium text-gray-400 mb-1">Observaciones</label>
 					<textarea
 						id="obs"
 						bind:value={observaciones}
 						rows="2"
-						placeholder="Opcional: notas sobre esta acta..."
-						class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none resize-none"
+						placeholder="Notas sobre esta acta..."
+						class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:bg-white outline-none resize-none transition-all"
 					></textarea>
 				</div>
 
-				<!-- Acciones -->
 				<div class="grid grid-cols-3 gap-2">
 					<button
 						onclick={() => updateEstado('verificada')}
 						disabled={loading}
-						class="bg-success-500 hover:bg-success-600 text-white text-sm font-medium py-2.5 rounded-lg transition-colors disabled:opacity-50"
+						class="bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium py-2.5 rounded-lg transition-colors disabled:opacity-50"
 					>
 						Verificar
 					</button>
 					<button
 						onclick={() => updateEstado('observada')}
 						disabled={loading}
-						class="bg-warning-500 hover:bg-warning-600 text-white text-sm font-medium py-2.5 rounded-lg transition-colors disabled:opacity-50"
+						class="bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-medium py-2.5 rounded-lg transition-colors disabled:opacity-50"
 					>
 						Observar
 					</button>
 					<button
 						onclick={() => updateEstado('rechazada')}
 						disabled={loading}
-						class="bg-danger-500 hover:bg-danger-600 text-white text-sm font-medium py-2.5 rounded-lg transition-colors disabled:opacity-50"
+						class="bg-white border border-danger-200 hover:bg-danger-50 text-danger-600 text-sm font-medium py-2.5 rounded-lg transition-colors disabled:opacity-50"
 					>
 						Rechazar
 					</button>
 				</div>
 			</div>
 		{:else}
-			<div class="bg-gray-50 rounded-xl border border-dashed border-gray-300 flex items-center justify-center p-12">
-				<p class="text-sm text-gray-400">Selecciona un acta para verificar</p>
+			<div class="bg-gray-50 rounded-xl flex items-center justify-center p-16">
+				<div class="text-center">
+					<svg class="w-10 h-10 text-gray-200 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+					</svg>
+					<p class="text-sm text-gray-400">Selecciona un acta para verificar</p>
+				</div>
 			</div>
 		{/if}
 	</div>
