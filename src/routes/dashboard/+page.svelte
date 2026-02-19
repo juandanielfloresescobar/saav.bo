@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy, tick } from 'svelte';
 	import { Chart, registerables } from 'chart.js';
 
 	Chart.register(...registerables);
@@ -52,6 +52,23 @@
 		setupRealtime();
 	});
 
+	// Reactively render charts when data changes and DOM is ready
+	$effect(() => {
+		// Read reactive dependencies to track them
+		const _loading = loading;
+		const _resultados = resultados;
+		const _evolucion = evolucion;
+		const _rpd = resultadosPorDistrito;
+
+		if (_loading) return;
+
+		// Wait for DOM to reflect state changes before rendering
+		tick().then(() => {
+			renderCharts();
+			renderMap();
+		});
+	});
+
 	onDestroy(() => {
 		if (channel) data.supabase.removeChannel(channel);
 		barChart?.destroy();
@@ -86,8 +103,6 @@
 			await recalculateLegacy();
 		}
 
-		renderCharts();
-		renderMap();
 	}
 
 	function applyRpcData(stats: any) {
@@ -294,6 +309,9 @@
 		L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
 			maxZoom: 19
 		}).addTo(map);
+
+		// Ensure map tiles render correctly after container is fully laid out
+		setTimeout(() => map?.invalidateSize(), 200);
 
 		// Add district markers
 		for (const [distName, votes] of Object.entries(resultadosPorDistrito)) {
