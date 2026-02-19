@@ -10,6 +10,12 @@ declare global {
 		}
 		interface PageData {
 			session: Session | null;
+			perfil: {
+				id: string;
+				rol: string;
+				nombre: string;
+				recinto_id: string | null;
+			} | null;
 		}
 	}
 }

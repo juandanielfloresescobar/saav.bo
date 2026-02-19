@@ -63,29 +63,69 @@
 	async function loadInitialData() {
 		loading = true;
 
-		const [partidosRes, distritosRes, mesasCount] = await Promise.all([
+		const [partidosRes, distritosRes] = await Promise.all([
 			data.supabase.from('partidos').select('*').order('orden'),
-			data.supabase.from('distritos').select('*').order('numero'),
-			data.supabase.from('mesas').select('*', { count: 'exact', head: true })
+			data.supabase.from('distritos').select('*').order('numero')
 		]);
 
 		partidos = partidosRes.data ?? [];
 		distritos = distritosRes.data ?? [];
-		totalMesas = mesasCount.count ?? 0;
 
 		await recalculate();
 		loading = false;
 	}
 
 	async function recalculate() {
+		// Try optimized RPC first, fall back to legacy queries
+		const { data: rpcData, error: rpcError } = await data.supabase
+			.rpc('get_dashboard_data', { p_distrito_id: filtroDistrito || null });
+
+		if (!rpcError && rpcData) {
+			applyRpcData(rpcData);
+		} else {
+			await recalculateLegacy();
+		}
+
+		renderCharts();
+		renderMap();
+	}
+
+	function applyRpcData(stats: any) {
+		totalMesas = stats.total_mesas ?? 0;
+		actasProcesadas = stats.actas?.procesadas ?? 0;
+		actasVerificadas = stats.actas?.verificadas ?? 0;
+		totalNulos = stats.actas?.total_nulos ?? 0;
+		totalBlancos = stats.actas?.total_blancos ?? 0;
+
+		const res: Record<string, { sigla: string; color: string; votos: number }> = {};
+		for (const vp of stats.votos_partido ?? []) {
+			res[vp.id] = { sigla: vp.sigla, color: vp.color, votos: vp.votos };
+		}
+		resultados = res;
+		totalVotosValidos = Object.values(res).reduce((s, r) => s + r.votos, 0);
+
+		evolucion = (stats.evolucion ?? []).map((e: any) => ({ hora: e.hora, actas: e.actas }));
+
+		if (!filtroDistrito && stats.por_distrito) {
+			const distRes: Record<string, Record<string, number>> = {};
+			for (const pd of stats.por_distrito) {
+				distRes[pd.distrito_nombre] = pd.votos ?? {};
+			}
+			resultadosPorDistrito = distRes;
+		}
+	}
+
+	async function recalculateLegacy() {
+		const mesasCount = await data.supabase.from('mesas').select('*', { count: 'exact', head: true });
+		totalMesas = mesasCount.count ?? 0;
+
 		let actasQuery = data.supabase
 			.from('actas')
 			.select(
-				`id, estado, total_votantes, votos_nulos, votos_blancos, created_at,
+				`id, estado, votos_nulos, votos_blancos, created_at,
 				 mesas!inner(recinto_id, recintos!inner(distrito_id))`,
 				{ count: 'exact' }
 			);
-
 		if (filtroDistrito) {
 			actasQuery = actasQuery.eq('mesas.recintos.distrito_id', filtroDistrito);
 		}
@@ -93,33 +133,23 @@
 		const { data: actasData, count: actasCount } = await actasQuery;
 		actasProcesadas = actasCount ?? 0;
 		actasVerificadas = actasData?.filter((a: any) => a.estado === 'verificada').length ?? 0;
-
 		totalNulos = actasData?.reduce((s: number, a: any) => s + a.votos_nulos, 0) ?? 0;
 		totalBlancos = actasData?.reduce((s: number, a: any) => s + a.votos_blancos, 0) ?? 0;
 
 		const actaIds = actasData?.map((a: any) => a.id) ?? [];
 		const res: Record<string, { sigla: string; color: string; votos: number }> = {};
-		for (const p of partidos) {
-			res[p.id] = { sigla: p.sigla, color: p.color, votos: 0 };
-		}
+		for (const p of partidos) res[p.id] = { sigla: p.sigla, color: p.color, votos: 0 };
 
 		if (actaIds.length > 0) {
 			const { data: votosData } = await data.supabase
-				.from('votos')
-				.select('partido_id, cantidad')
-				.in('acta_id', actaIds);
-
+				.from('votos').select('partido_id, cantidad').in('acta_id', actaIds);
 			for (const v of votosData ?? []) {
-				if (res[v.partido_id]) {
-					res[v.partido_id].votos += v.cantidad;
-				}
+				if (res[v.partido_id]) res[v.partido_id].votos += v.cantidad;
 			}
 		}
-
 		resultados = res;
 		totalVotosValidos = Object.values(res).reduce((s, r) => s + r.votos, 0);
 
-		// Evolucion temporal
 		const evoMap = new Map<string, number>();
 		let runningCount = 0;
 		const sorted = [...(actasData ?? [])].sort(
@@ -127,43 +157,30 @@
 		);
 		for (const acta of sorted) {
 			runningCount++;
-			const hora = new Date(acta.created_at).toLocaleTimeString('es-BO', {
-				hour: '2-digit',
-				minute: '2-digit'
-			});
+			const hora = new Date(acta.created_at).toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' });
 			evoMap.set(hora, runningCount);
 		}
 		evolucion = [...evoMap.entries()].map(([hora, actas]) => ({ hora, actas }));
 
-		// Resultados por distrito
 		if (!filtroDistrito) {
 			const distRes: Record<string, Record<string, number>> = {};
 			for (const d of distritos) {
 				distRes[d.nombre] = {};
-				for (const p of partidos) {
-					distRes[d.nombre][p.sigla] = 0;
-				}
+				for (const p of partidos) distRes[d.nombre][p.sigla] = 0;
 			}
-
 			if (actaIds.length > 0) {
 				const { data: votosConActa } = await data.supabase
 					.from('votos')
 					.select('partido_id, cantidad, actas!inner(mesas!inner(recintos!inner(distritos!inner(nombre))))')
 					.in('acta_id', actaIds);
-
 				for (const v of votosConActa ?? []) {
 					const distNombre = (v as any).actas?.mesas?.recintos?.distritos?.nombre;
 					const partido = partidos.find((p: any) => p.id === v.partido_id);
-					if (distNombre && partido && distRes[distNombre]) {
-						distRes[distNombre][partido.sigla] += v.cantidad;
-					}
+					if (distNombre && partido && distRes[distNombre]) distRes[distNombre][partido.sigla] += v.cantidad;
 				}
 			}
 			resultadosPorDistrito = distRes;
 		}
-
-		renderCharts();
-		renderMap();
 	}
 
 	function renderCharts() {

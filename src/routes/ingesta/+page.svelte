@@ -188,7 +188,21 @@
 			await loadHistorial();
 			resetForm();
 		} catch (err: any) {
-			error = err.message || 'Error al enviar el acta.';
+			const code = err?.code;
+			const msg = err?.message ?? '';
+
+			if (code === '23505') {
+				error = 'Ya existe un acta registrada para esta mesa. No se puede duplicar.';
+			} else if (code === '42501' || msg.includes('policy')) {
+				error = 'No tienes permisos para registrar actas en esta mesa.';
+			} else if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || !navigator.onLine) {
+				error = 'Error de conexion. Guardando acta localmente...';
+				await savePendingActa(actaData);
+				pendingCount++;
+				resetForm();
+			} else {
+				error = msg || 'Error al enviar el acta.';
+			}
 		}
 		loading = false;
 	}

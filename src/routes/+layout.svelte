@@ -13,7 +13,15 @@
 	onMount(() => {
 		const {
 			data: { subscription }
-		} = supabase.auth.onAuthStateChange((_event, newSession) => {
+		} = supabase.auth.onAuthStateChange((event, newSession) => {
+			if (event === 'SIGNED_OUT') {
+				goto('/auth');
+				return;
+			}
+			if (event === 'TOKEN_REFRESHED' && !newSession) {
+				goto('/auth');
+				return;
+			}
 			if (newSession?.expires_at !== session?.expires_at) {
 				invalidate('supabase:auth');
 			}

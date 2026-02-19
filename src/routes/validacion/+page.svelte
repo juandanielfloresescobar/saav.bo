@@ -12,6 +12,8 @@
 	let loading = $state(false);
 	let observaciones = $state('');
 	let counts = $state({ pendiente: 0, verificada: 0, observada: 0, rechazada: 0 });
+	let hasMore = $state(false);
+	const PAGE_SIZE = 50;
 
 	onMount(async () => {
 		await Promise.all([loadActas(), loadDistritos(), loadCounts()]);
@@ -23,17 +25,31 @@
 	}
 
 	async function loadCounts() {
-		const estados = ['pendiente', 'verificada', 'observada', 'rechazada'] as const;
-		for (const estado of estados) {
-			const { count } = await data.supabase
-				.from('actas')
-				.select('*', { count: 'exact', head: true })
-				.eq('estado', estado);
-			counts[estado] = count ?? 0;
+		// Try RPC first (single query), fall back to sequential counts
+		const { data: rpcData, error: rpcError } = await data.supabase
+			.rpc('get_acta_counts_by_estado');
+
+		if (!rpcError && rpcData) {
+			const fresh = { pendiente: 0, verificada: 0, observada: 0, rechazada: 0 };
+			for (const row of rpcData) {
+				if (row.estado in fresh) {
+					(fresh as any)[row.estado] = Number(row.count);
+				}
+			}
+			counts = fresh;
+		} else {
+			const estados = ['pendiente', 'verificada', 'observada', 'rechazada'] as const;
+			for (const estado of estados) {
+				const { count } = await data.supabase
+					.from('actas')
+					.select('*', { count: 'exact', head: true })
+					.eq('estado', estado);
+				counts[estado] = count ?? 0;
+			}
 		}
 	}
 
-	async function loadActas() {
+	async function loadActas(append = false) {
 		loading = true;
 		let query = data.supabase
 			.from('actas')
@@ -44,14 +60,22 @@
 				 usuarios!actas_delegado_id_fkey(nombre)`
 			)
 			.eq('estado', filtroEstado)
-			.order('created_at', { ascending: true });
+			.order('created_at', { ascending: true })
+			.range(append ? actas.length : 0, (append ? actas.length : 0) + PAGE_SIZE - 1);
 
 		if (filtroDistrito) {
 			query = query.eq('mesas.recintos.distrito_id', filtroDistrito);
 		}
 
 		const { data: result } = await query;
-		actas = result ?? [];
+		const fetched = result ?? [];
+		hasMore = fetched.length === PAGE_SIZE;
+
+		if (append) {
+			actas = [...actas, ...fetched];
+		} else {
+			actas = fetched;
+		}
 		loading = false;
 	}
 
@@ -161,6 +185,16 @@
 						<p class="text-xs text-gray-400 mt-0.5">Delegado: {acta.usuarios?.nombre}</p>
 					</button>
 				{/each}
+
+				{#if hasMore}
+					<button
+						onclick={() => loadActas(true)}
+						disabled={loading}
+						class="w-full py-2.5 text-sm font-medium text-primary-600 hover:bg-primary-50 rounded-lg transition-colors disabled:opacity-50"
+					>
+						{loading ? 'Cargando...' : 'Cargar mas actas'}
+					</button>
+				{/if}
 			{/if}
 		</div>
 
