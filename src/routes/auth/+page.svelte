@@ -19,7 +19,7 @@
 		});
 
 		if (authError) {
-			error = 'Credenciales inválidas. Contacta al administrador.';
+			error = 'Credenciales invalidas. Contacta al administrador.';
 			loading = false;
 			return;
 		}
@@ -29,34 +29,32 @@
 </script>
 
 <svelte:head>
-	<title>Quantis - Iniciar Sesión</title>
+	<title>Quantis - Iniciar Sesion</title>
 </svelte:head>
 
-<div class="min-h-screen bg-gradient-to-br from-primary-600 via-primary-700 to-primary-900 flex items-center justify-center px-4">
-	<div class="w-full max-w-md">
+<div class="min-h-screen bg-white flex items-center justify-center px-4">
+	<div class="w-full max-w-sm">
 		<!-- Logo -->
-		<div class="text-center mb-8">
-			<div class="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-				<span class="text-primary-600 font-bold text-3xl">Q</span>
+		<div class="text-center mb-10">
+			<div class="w-14 h-14 bg-primary-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+				<span class="text-white font-extrabold text-2xl">Q</span>
 			</div>
-			<h1 class="text-3xl font-bold text-white">Quantis</h1>
-			<p class="text-primary-200 mt-1">Sistema de Control Electoral</p>
+			<h1 class="text-2xl font-bold text-gray-900 tracking-tight">Quantis</h1>
+			<p class="text-sm text-gray-400 mt-1">Sistema de Control Electoral</p>
 		</div>
 
 		<!-- Login Card -->
-		<div class="bg-white rounded-2xl shadow-xl p-8">
-			<h2 class="text-xl font-semibold text-gray-900 mb-6">Iniciar Sesión</h2>
-
+		<div class="space-y-6">
 			{#if error}
-				<div class="bg-danger-500/10 border border-danger-500/20 text-danger-600 text-sm rounded-lg px-4 py-3 mb-4">
+				<div class="bg-danger-50 text-danger-600 text-sm rounded-lg px-4 py-3">
 					{error}
 				</div>
 			{/if}
 
 			<form onsubmit={handleLogin} class="space-y-4">
 				<div>
-					<label for="email" class="block text-sm font-medium text-gray-700 mb-1">
-						Correo electrónico
+					<label for="email" class="block text-sm font-medium text-gray-700 mb-1.5">
+						Correo electronico
 					</label>
 					<input
 						id="email"
@@ -64,36 +62,46 @@
 						bind:value={email}
 						required
 						placeholder="delegado@quantis.bo"
-						class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-shadow text-sm"
+						class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:bg-white outline-none transition-all text-sm"
 					/>
 				</div>
 
 				<div>
-					<label for="password" class="block text-sm font-medium text-gray-700 mb-1">
-						Contraseña
+					<label for="password" class="block text-sm font-medium text-gray-700 mb-1.5">
+						Contrasena
 					</label>
 					<input
 						id="password"
 						type="password"
 						bind:value={password}
 						required
-						placeholder="Tu contraseña"
-						class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-shadow text-sm"
+						placeholder="Tu contrasena"
+						class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:bg-white outline-none transition-all text-sm"
 					/>
 				</div>
 
 				<button
 					type="submit"
 					disabled={loading}
-					class="w-full bg-primary-600 hover:bg-primary-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+					class="w-full bg-primary-600 hover:bg-primary-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
 				>
-					{loading ? 'Ingresando...' : 'Ingresar'}
+					{#if loading}
+						<span class="flex items-center justify-center gap-2">
+							<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+								<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+								<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+							</svg>
+							Ingresando...
+						</span>
+					{:else}
+						Ingresar
+					{/if}
 				</button>
 			</form>
-		</div>
 
-		<p class="text-center text-primary-200 text-xs mt-6">
-			Elecciones Subnacionales 2026 — Santa Cruz de la Sierra
-		</p>
+			<p class="text-center text-gray-300 text-xs">
+				Elecciones Subnacionales 2026 — Santa Cruz de la Sierra
+			</p>
+		</div>
 	</div>
 </div>
