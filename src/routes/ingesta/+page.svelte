@@ -243,49 +243,55 @@
 	<title>Quantis - Ingesta de Actas</title>
 </svelte:head>
 
-<div class="max-w-2xl mx-auto px-4 py-6">
+<div class="max-w-2xl mx-auto px-4 py-8 animate-in">
 	<!-- Header -->
-	<div class="flex items-center justify-between mb-6">
+	<div class="flex items-center justify-between mb-8">
 		<div>
-			<h1 class="text-lg font-bold text-gray-900">Ingesta de Actas</h1>
-			<p class="text-xs text-gray-400 mt-0.5">Registra los datos del acta electoral</p>
+			<h1 class="text-xl font-extrabold text-slate-900 tracking-tight">Ingesta de Actas</h1>
+			<p class="text-[13px] text-slate-400 mt-1 font-medium">Registra los datos del acta electoral</p>
 		</div>
 		<div class="flex items-center gap-2">
 			{#if pendingCount > 0}
-				<span class="bg-warning-50 text-warning-600 text-xs font-medium px-2.5 py-1 rounded-full">
+				<span class="badge bg-warning-50 border border-warning-100 text-warning-600">
+					<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+					</svg>
 					{pendingCount} pendiente{pendingCount > 1 ? 's' : ''}
 				</span>
 			{/if}
-			<span
-				class="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full
-					{online ? 'bg-primary-50 text-primary-600' : 'bg-gray-100 text-gray-500'}"
-			>
-				<span class="w-1.5 h-1.5 rounded-full {online ? 'bg-primary-500' : 'bg-gray-400'}"></span>
+			<div class="badge {online ? 'bg-primary-50 border border-primary-100 text-primary-600' : 'bg-slate-100 border border-slate-200 text-slate-500'}">
+				<span class="w-2 h-2 rounded-full {online ? 'bg-primary-500 live-dot' : 'bg-slate-400'}"></span>
 				{online ? 'En linea' : 'Sin conexion'}
-			</span>
+			</div>
 		</div>
 	</div>
 
 	{#if success}
-		<div class="bg-success-50 text-success-600 text-sm rounded-lg px-4 py-3 mb-4">
+		<div class="flex items-center gap-2.5 bg-success-50 border border-success-100 text-success-600 text-sm rounded-xl px-4 py-3 mb-6">
+			<svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+			</svg>
 			{success}
 		</div>
 	{/if}
 
 	{#if error}
-		<div class="bg-danger-50 text-danger-600 text-sm rounded-lg px-4 py-3 mb-4">
+		<div class="flex items-center gap-2.5 bg-danger-50 border border-danger-100 text-danger-600 text-sm rounded-xl px-4 py-3 mb-6">
+			<svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+			</svg>
 			{error}
 		</div>
 	{/if}
 
-	<form onsubmit={handleSubmit} class="space-y-4">
+	<form onsubmit={handleSubmit} class="space-y-5">
 		<!-- Mesa -->
-		<div class="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
-			<h2 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Mesa Electoral</h2>
+		<div class="card p-6">
+			<h2 class="section-title mb-3">Mesa Electoral</h2>
 			<select
 				bind:value={selectedMesa}
 				required
-				class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:bg-white outline-none transition-all"
+				class="input"
 			>
 				<option value="">Seleccionar mesa...</option>
 				{#each mesas as mesa}
@@ -295,15 +301,15 @@
 		</div>
 
 		<!-- Foto -->
-		<div class="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
-			<h2 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Foto del Acta</h2>
+		<div class="card p-6">
+			<h2 class="section-title mb-3">Foto del Acta</h2>
 			{#if fotoPreview}
-				<div class="relative mb-3">
-					<img src={fotoPreview} alt="Preview del acta" class="w-full rounded-lg" />
+				<div class="relative">
+					<img src={fotoPreview} alt="Preview del acta" class="w-full rounded-xl" />
 					<button
 						type="button"
 						onclick={() => { fotoFile = null; fotoPreview = ''; }}
-						class="absolute top-2 right-2 bg-white text-gray-500 w-7 h-7 rounded-full flex items-center justify-center shadow-sm hover:text-gray-700"
+						class="absolute top-3 right-3 bg-white/90 glass text-slate-500 w-8 h-8 rounded-full flex items-center justify-center shadow-lg hover:text-slate-700 transition-colors"
 						aria-label="Eliminar foto"
 					>
 						<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
@@ -312,12 +318,14 @@
 					</button>
 				</div>
 			{:else}
-				<label class="flex flex-col items-center justify-center w-full h-32 border border-dashed border-gray-200 rounded-lg cursor-pointer hover:border-primary-300 hover:bg-primary-50/30 transition-all">
-					<svg class="w-8 h-8 text-gray-300 mb-2" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
-						<path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
-					</svg>
-					<p class="text-xs text-gray-400">
+				<label class="flex flex-col items-center justify-center w-full h-36 border-2 border-dashed border-slate-200 rounded-xl cursor-pointer hover:border-primary-300 hover:bg-primary-50/30 transition-all group">
+					<div class="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center mb-3 group-hover:bg-primary-50 transition-colors">
+						<svg class="w-6 h-6 text-slate-300 group-hover:text-primary-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+							<path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
+						</svg>
+					</div>
+					<p class="text-[13px] text-slate-400 font-medium">
 						{compressing ? 'Comprimiendo...' : 'Toca para capturar foto'}
 					</p>
 					<input type="file" accept="image/*" capture="environment" onchange={handleFoto} class="hidden" />
@@ -326,61 +334,61 @@
 		</div>
 
 		<!-- Votos -->
-		<div class="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
-			<h2 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Votos por Partido</h2>
-			<div class="space-y-2.5">
+		<div class="card p-6">
+			<h2 class="section-title mb-4">Votos por Partido</h2>
+			<div class="space-y-3">
 				{#each partidos as partido}
 					<div class="flex items-center justify-between gap-3">
-						<div class="flex items-center gap-2 flex-1 min-w-0">
-							<span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: {partido.color}"></span>
-							<span class="text-sm text-gray-700 truncate">{partido.sigla}</span>
+						<div class="flex items-center gap-2.5 flex-1 min-w-0">
+							<span class="w-3 h-3 rounded-full shrink-0 shadow-sm" style="background-color: {partido.color}"></span>
+							<span class="text-[13px] text-slate-700 truncate font-medium">{partido.sigla}</span>
 						</div>
 						<input
 							type="number"
 							min="0"
 							max="300"
 							bind:value={votos[partido.id]}
-							class="w-20 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-center focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:bg-white outline-none transition-all"
+							class="input !w-20 text-center !px-2 tabular-nums font-semibold"
 						/>
 					</div>
 				{/each}
 
-				<div class="border-t border-gray-100 pt-2.5 mt-2.5 space-y-2.5">
+				<div class="border-t border-slate-100 pt-3 mt-3 space-y-3">
 					<div class="flex items-center justify-between gap-3">
-						<span class="text-sm text-gray-500">Votos Nulos</span>
+						<span class="text-[13px] text-slate-500 font-medium">Votos Nulos</span>
 						<input
 							type="number" min="0" max="300"
 							bind:value={votosNulos}
-							class="w-20 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-center focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:bg-white outline-none transition-all"
+							class="input !w-20 text-center !px-2 tabular-nums font-semibold"
 						/>
 					</div>
 					<div class="flex items-center justify-between gap-3">
-						<span class="text-sm text-gray-500">Votos en Blanco</span>
+						<span class="text-[13px] text-slate-500 font-medium">Votos en Blanco</span>
 						<input
 							type="number" min="0" max="300"
 							bind:value={votosBlancos}
-							class="w-20 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-center focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:bg-white outline-none transition-all"
+							class="input !w-20 text-center !px-2 tabular-nums font-semibold"
 						/>
 					</div>
 				</div>
 
-				<div class="border-t border-gray-100 pt-2.5 mt-2.5">
+				<div class="border-t border-slate-100 pt-3 mt-3">
 					<div class="flex items-center justify-between gap-3">
-						<span class="text-sm font-semibold text-gray-900">Total Votantes</span>
+						<span class="text-[13px] font-bold text-slate-900">Total Votantes</span>
 						<input
 							type="number" min="1" max="300"
 							bind:value={totalVotantes}
 							required
-							class="w-20 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-center font-semibold focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:bg-white outline-none transition-all"
+							class="input !w-20 text-center !px-2 tabular-nums font-bold"
 						/>
 					</div>
 
-					<div class="flex items-center justify-between text-xs px-3 py-2 rounded-lg mt-2.5
+					<div class="flex items-center justify-between text-[12px] px-3.5 py-2.5 rounded-xl mt-3 font-semibold
 						{totalVotantes > 0 && sumaVotos === totalVotantes
-							? 'bg-success-50 text-success-600'
+							? 'bg-success-50 border border-success-100 text-success-600'
 							: totalVotantes > 0
-								? 'bg-danger-50 text-danger-600'
-								: 'bg-gray-50 text-gray-400'}">
+								? 'bg-danger-50 border border-danger-100 text-danger-600'
+								: 'bg-slate-50 border border-slate-100 text-slate-400'}">
 						<span>Suma: {sumaVotos}</span>
 						<span>
 							{#if totalVotantes > 0 && sumaVotos === totalVotantes}
@@ -399,10 +407,16 @@
 		<button
 			type="submit"
 			disabled={loading || !selectedMesa || !validation.valid}
-			class="w-full bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3 px-4 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-sm"
+			class="w-full btn-primary py-3.5 text-[15px]"
 		>
 			{#if loading}
-				Enviando acta...
+				<span class="flex items-center justify-center gap-2">
+					<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+						<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+						<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+					</svg>
+					Enviando acta...
+				</span>
 			{:else if !online}
 				Guardar localmente
 			{:else}
@@ -413,25 +427,25 @@
 
 	<!-- Historial -->
 	{#if historial.length > 0}
-		<div class="mt-8">
-			<h2 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Actas Enviadas</h2>
-			<div class="space-y-2">
+		<div class="mt-10">
+			<h2 class="section-title mb-4">Actas Enviadas</h2>
+			<div class="space-y-2.5">
 				{#each historial as acta}
-					<div class="bg-white rounded-lg border border-gray-100 px-4 py-3 flex items-center justify-between shadow-sm">
+					<div class="card-flat px-5 py-3.5 flex items-center justify-between">
 						<div>
-							<span class="text-sm font-medium text-gray-900">Mesa {acta.mesas?.numero}</span>
-							<span class="text-xs text-gray-400 ml-2">
+							<span class="text-[13px] font-semibold text-slate-800">Mesa {acta.mesas?.numero}</span>
+							<span class="text-[12px] text-slate-400 ml-2 font-medium">
 								{new Date(acta.created_at).toLocaleString('es-BO', { hour: '2-digit', minute: '2-digit' })}
 							</span>
 						</div>
-						<span class="text-xs font-medium px-2 py-0.5 rounded-full
+						<span class="badge
 							{acta.estado === 'verificada'
 								? 'bg-success-50 text-success-600'
 								: acta.estado === 'observada'
 									? 'bg-warning-50 text-warning-600'
 									: acta.estado === 'rechazada'
 										? 'bg-danger-50 text-danger-600'
-										: 'bg-gray-50 text-gray-500'}">
+										: 'bg-slate-50 text-slate-500'}">
 							{acta.estado}
 						</span>
 					</div>

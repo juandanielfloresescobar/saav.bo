@@ -152,16 +152,17 @@
 	<title>Quantis - Validacion de Actas</title>
 </svelte:head>
 
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-	<div class="flex items-center justify-between mb-6">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in">
+	<div class="flex items-center justify-between mb-8">
 		<div>
-			<h1 class="text-lg font-bold text-gray-900">Validacion de Actas</h1>
-			<p class="text-xs text-gray-400 mt-0.5">Verifica las actas cargadas por delegados</p>
+			<h1 class="text-xl font-extrabold text-slate-900 tracking-tight">Validacion de Actas</h1>
+			<p class="text-[13px] text-slate-400 mt-1 font-medium">Verifica las actas cargadas por delegados</p>
 		</div>
 		<select
 			bind:value={filtroDistrito}
 			onchange={() => loadActas()}
-			class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
+			aria-label="Filtrar por distrito"
+			class="input !w-auto !py-2 !px-3 !text-[13px]"
 		>
 			<option value="">Todos los distritos</option>
 			{#each distritos as d}
@@ -170,54 +171,71 @@
 		</select>
 	</div>
 
+	{#if pageError}
+		<div class="flex items-center gap-2.5 bg-danger-50 border border-danger-100 text-danger-600 text-sm rounded-xl px-4 py-3 mb-6">
+			<svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+			</svg>
+			{pageError}
+		</div>
+	{/if}
+
 	<!-- Contadores -->
-	<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+	<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
 		{#each ESTADOS as estado}
 			{@const active = filtroEstado === estado}
+			{@const cfg = estadoConfig[estado]}
 			<button
 				onclick={() => { filtroEstado = estado as EstadoActa; loadActas(); }}
-				class="bg-white rounded-xl border p-4 text-left transition-all shadow-sm
-					{active ? 'border-primary-500 ring-1 ring-primary-200' : 'border-gray-100 hover:border-gray-200'}"
+				class="card-flat p-4 text-left transition-all
+					{active ? 'ring-2 ring-primary-500/30 border-primary-400' : 'hover:border-slate-300'}"
 			>
-				<p class="text-2xl font-bold {estado === 'verificada' ? 'text-success-600' : estado === 'observada' ? 'text-warning-600' : estado === 'rechazada' ? 'text-danger-600' : 'text-gray-900'}">
+				<p class="text-[26px] font-extrabold tabular-nums leading-none
+					{estado === 'verificada' ? 'text-success-600' : estado === 'observada' ? 'text-warning-600' : estado === 'rechazada' ? 'text-danger-600' : 'text-slate-900'}">
 					{counts[estado]}
 				</p>
-				<p class="text-xs text-gray-400 mt-0.5">{estadoConfig[estado].label}</p>
+				<p class="text-[12px] text-slate-400 mt-2 font-semibold">{cfg.label}</p>
 			</button>
 		{/each}
 	</div>
 
-	{#if pageError}
-		<div class="bg-red-50 text-red-600 text-sm rounded-lg px-4 py-3 mb-4">{pageError}</div>
-	{/if}
-
 	<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 		<!-- Lista de actas -->
-		<div class="space-y-2">
+		<div class="space-y-2.5">
 			{#if loading && !selectedActa}
-				<div class="text-center py-12 text-gray-400 text-sm">Cargando actas...</div>
+				<div class="flex items-center justify-center py-16">
+					<div class="flex items-center gap-2.5 text-slate-400">
+						<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+							<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+							<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+						</svg>
+						<span class="text-sm font-medium">Cargando actas...</span>
+					</div>
+				</div>
 			{:else if actas.length === 0}
-				<div class="text-center py-12">
-					<svg class="w-10 h-10 text-gray-200 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-					</svg>
-					<p class="text-sm text-gray-400">No hay actas {filtroEstado === 'pendiente' ? 'pendientes' : 'con estado "' + filtroEstado + '"'}</p>
+				<div class="text-center py-16">
+					<div class="w-14 h-14 rounded-xl bg-slate-50 flex items-center justify-center mx-auto mb-4">
+						<svg class="w-7 h-7 text-slate-300" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+						</svg>
+					</div>
+					<p class="text-[13px] text-slate-400 font-medium">No hay actas {filtroEstado === 'pendiente' ? 'pendientes' : 'con estado "' + filtroEstado + '"'}</p>
 				</div>
 			{:else}
 				{#each actas as acta}
 					<button
 						onclick={() => selectActa(acta)}
-						class="w-full text-left bg-white rounded-lg border p-4 transition-all shadow-sm
-							{selectedActa?.id === acta.id ? 'border-primary-500 ring-1 ring-primary-200' : 'border-gray-100 hover:border-gray-200'}"
+						class="w-full text-left card-flat p-4 transition-all
+							{selectedActa?.id === acta.id ? 'ring-2 ring-primary-500/30 border-primary-400' : 'hover:border-slate-300'}"
 					>
-						<div class="flex items-center justify-between mb-1">
-							<span class="text-sm font-semibold text-gray-900">Mesa {acta.mesas?.numero}</span>
-							<span class="text-xs text-gray-400">
+						<div class="flex items-center justify-between mb-1.5">
+							<span class="text-[13px] font-bold text-slate-800">Mesa {acta.mesas?.numero}</span>
+							<span class="text-[12px] text-slate-400 font-medium">
 								{new Date(acta.created_at).toLocaleString('es-BO', { hour: '2-digit', minute: '2-digit' })}
 							</span>
 						</div>
-						<p class="text-xs text-gray-500">{acta.mesas?.recintos?.nombre} — D{acta.mesas?.recintos?.distritos?.numero}</p>
-						<p class="text-xs text-gray-400 mt-0.5">Delegado: {acta.usuarios?.nombre}</p>
+						<p class="text-[12px] text-slate-500 font-medium">{acta.mesas?.recintos?.nombre} — D{acta.mesas?.recintos?.distritos?.numero}</p>
+						<p class="text-[11px] text-slate-400 mt-0.5">Delegado: {acta.usuarios?.nombre}</p>
 					</button>
 				{/each}
 
@@ -225,7 +243,7 @@
 					<button
 						onclick={() => loadActas(true)}
 						disabled={loading}
-						class="w-full py-2.5 text-sm font-medium text-primary-600 hover:bg-primary-50 rounded-lg transition-colors disabled:opacity-50"
+						class="w-full py-3 text-[13px] font-semibold text-primary-600 hover:bg-primary-50 rounded-xl transition-colors disabled:opacity-50"
 					>
 						{loading ? 'Cargando...' : 'Cargar mas actas'}
 					</button>
@@ -235,94 +253,101 @@
 
 		<!-- Panel de verificacion -->
 		{#if selectedActa}
-			<div class="bg-white rounded-xl border border-gray-100 p-5 sticky top-20 shadow-sm">
-				<h3 class="text-sm font-semibold text-gray-900 mb-4">
+			<div class="card p-6 sticky top-24">
+				<h3 class="text-[14px] font-bold text-slate-900 mb-5">
 					Verificar — Mesa {selectedActa.mesas?.numero}
 				</h3>
 
 				{#if selectedActa.foto_url && selectedActa.foto_url.startsWith('https://')}
-					<div class="mb-4">
+					<div class="mb-5">
 						<img
 							src={selectedActa.foto_url}
 							alt="Acta electoral"
-							class="w-full rounded-lg cursor-zoom-in"
+							class="w-full rounded-xl cursor-zoom-in shadow-sm"
 						/>
 					</div>
 				{:else}
-					<div class="mb-4 bg-gray-50 rounded-lg p-8 text-center text-sm text-gray-400">
-						Sin foto adjunta
+					<div class="mb-5 bg-slate-50 rounded-xl p-10 text-center border border-slate-100">
+						<div class="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center mx-auto mb-2">
+							<svg class="w-5 h-5 text-slate-300" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H3.75A2.25 2.25 0 001.5 6.75v12a2.25 2.25 0 002.25 2.25z" />
+							</svg>
+						</div>
+						<p class="text-[13px] text-slate-400 font-medium">Sin foto adjunta</p>
 					</div>
 				{/if}
 
-				<div class="space-y-2 mb-4">
-					<h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Datos</h4>
+				<div class="space-y-2 mb-5">
+					<h4 class="section-title mb-3">Datos del Acta</h4>
 					{#each votosActa as voto}
-						<div class="flex items-center justify-between text-sm">
-							<div class="flex items-center gap-2">
-								<span class="w-2 h-2 rounded-full" style="background-color: {voto.partidos?.color}"></span>
-								<span class="text-gray-600">{voto.partidos?.sigla}</span>
+						<div class="flex items-center justify-between text-[13px] py-1">
+							<div class="flex items-center gap-2.5">
+								<span class="w-2.5 h-2.5 rounded-full shadow-sm" style="background-color: {voto.partidos?.color}"></span>
+								<span class="text-slate-600 font-medium">{voto.partidos?.sigla}</span>
 							</div>
-							<span class="font-semibold text-gray-900 tabular-nums">{voto.cantidad}</span>
+							<span class="font-bold text-slate-900 tabular-nums">{voto.cantidad}</span>
 						</div>
 					{/each}
-					<div class="border-t border-gray-100 pt-2 space-y-1.5">
-						<div class="flex justify-between text-sm">
-							<span class="text-gray-400">Nulos</span>
-							<span class="text-gray-600 tabular-nums">{selectedActa.votos_nulos}</span>
+					<div class="border-t border-slate-100 pt-2.5 mt-2 space-y-1.5">
+						<div class="flex justify-between text-[13px]">
+							<span class="text-slate-400 font-medium">Nulos</span>
+							<span class="text-slate-600 tabular-nums font-semibold">{selectedActa.votos_nulos}</span>
 						</div>
-						<div class="flex justify-between text-sm">
-							<span class="text-gray-400">Blancos</span>
-							<span class="text-gray-600 tabular-nums">{selectedActa.votos_blancos}</span>
+						<div class="flex justify-between text-[13px]">
+							<span class="text-slate-400 font-medium">Blancos</span>
+							<span class="text-slate-600 tabular-nums font-semibold">{selectedActa.votos_blancos}</span>
 						</div>
-						<div class="flex justify-between text-sm font-semibold">
-							<span class="text-gray-900">Total</span>
-							<span class="text-gray-900 tabular-nums">{selectedActa.total_votantes}</span>
+						<div class="flex justify-between text-[13px] font-bold pt-1">
+							<span class="text-slate-900">Total</span>
+							<span class="text-slate-900 tabular-nums">{selectedActa.total_votantes}</span>
 						</div>
 					</div>
 				</div>
 
-				<div class="mb-4">
-					<label for="obs" class="block text-xs font-medium text-gray-400 mb-1">Observaciones</label>
+				<div class="mb-5">
+					<label for="obs" class="block section-title mb-2">Observaciones</label>
 					<textarea
 						id="obs"
 						bind:value={observaciones}
 						rows="2"
 						placeholder="Notas sobre esta acta..."
-						class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:bg-white outline-none resize-none transition-all"
+						class="input resize-none"
 					></textarea>
 				</div>
 
-				<div class="grid grid-cols-3 gap-2">
+				<div class="grid grid-cols-3 gap-2.5">
 					<button
 						onclick={() => updateEstado('verificada' as EstadoActa)}
 						disabled={loading}
-						class="bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium py-2.5 rounded-lg transition-colors disabled:opacity-50"
+						class="btn-primary py-2.5 text-[13px] text-center"
 					>
 						Verificar
 					</button>
 					<button
 						onclick={() => updateEstado('observada' as EstadoActa)}
 						disabled={loading}
-						class="bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-medium py-2.5 rounded-lg transition-colors disabled:opacity-50"
+						class="bg-white border-1.5 border-slate-200 hover:bg-slate-50 text-slate-700 text-[13px] font-semibold py-2.5 rounded-xl transition-colors disabled:opacity-50"
 					>
 						Observar
 					</button>
 					<button
 						onclick={() => updateEstado('rechazada' as EstadoActa)}
 						disabled={loading}
-						class="bg-white border border-danger-200 hover:bg-danger-50 text-danger-600 text-sm font-medium py-2.5 rounded-lg transition-colors disabled:opacity-50"
+						class="bg-white border-1.5 border-danger-200 hover:bg-danger-50 text-danger-600 text-[13px] font-semibold py-2.5 rounded-xl transition-colors disabled:opacity-50"
 					>
 						Rechazar
 					</button>
 				</div>
 			</div>
 		{:else}
-			<div class="bg-gray-50 rounded-xl flex items-center justify-center p-16">
+			<div class="bg-slate-50/50 border border-dashed border-slate-200 rounded-2xl flex items-center justify-center p-20">
 				<div class="text-center">
-					<svg class="w-10 h-10 text-gray-200 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
-					</svg>
-					<p class="text-sm text-gray-400">Selecciona un acta para verificar</p>
+					<div class="w-14 h-14 rounded-xl bg-white border border-slate-100 flex items-center justify-center mx-auto mb-4 shadow-sm">
+						<svg class="w-7 h-7 text-slate-300" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+						</svg>
+					</div>
+					<p class="text-[13px] text-slate-400 font-medium">Selecciona un acta para verificar</p>
 				</div>
 			</div>
 		{/if}

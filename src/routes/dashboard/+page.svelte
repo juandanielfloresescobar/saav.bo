@@ -424,99 +424,115 @@
 	<title>Quantis - Dashboard Electoral</title>
 </svelte:head>
 
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in">
 	<!-- Header -->
-	<div class="flex items-center justify-between mb-6">
+	<div class="flex items-center justify-between mb-8">
 		<div>
-			<h1 class="text-lg font-bold text-gray-900">Panel de Resultados</h1>
-			<p class="text-xs text-gray-400 mt-0.5">Conteo rapido — Santa Cruz de la Sierra</p>
+			<h1 class="text-xl font-extrabold text-slate-900 tracking-tight">Panel de Resultados</h1>
+			<p class="text-[13px] text-slate-400 mt-1 font-medium">Conteo rapido — Santa Cruz de la Sierra</p>
 		</div>
 		<div class="flex items-center gap-3">
 			<select
 				bind:value={filtroDistrito}
 				onchange={handleFiltroChange}
 				aria-label="Filtrar por distrito"
-				class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
+				class="input !w-auto !py-2 !px-3 !text-[13px]"
 			>
 				<option value="">Todos los distritos</option>
 				{#each distritos as d}
 					<option value={d.id}>{d.nombre}</option>
 				{/each}
 			</select>
-			<span class="flex items-center gap-1.5 text-xs font-medium text-primary-600 bg-primary-50 px-2.5 py-1.5 rounded-full">
-				<span class="w-1.5 h-1.5 rounded-full bg-primary-500 animate-pulse"></span>
+			<div class="flex items-center gap-2 text-[12px] font-semibold text-primary-600 bg-primary-50 border border-primary-100 px-3 py-1.5 rounded-full">
+				<span class="w-2 h-2 rounded-full bg-primary-500 live-dot"></span>
 				En vivo
-			</span>
+			</div>
 		</div>
 	</div>
 
 	{#if loadError}
-		<div class="bg-red-50 text-red-600 text-sm rounded-lg px-4 py-3 mb-4">{loadError}</div>
+		<div class="flex items-center gap-2.5 bg-danger-50 border border-danger-100 text-danger-600 text-sm rounded-xl px-4 py-3 mb-6">
+			<svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+			</svg>
+			{loadError}
+		</div>
 	{/if}
 
 	{#if loading}
-		<div class="flex items-center justify-center py-20">
-			<div class="flex items-center gap-2 text-gray-400">
+		<div class="flex flex-col items-center justify-center py-24">
+			<div class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-600 to-primary-800 flex items-center justify-center mb-4 shadow-lg shadow-primary-600/20">
+				<span class="text-white font-extrabold text-sm">Q</span>
+			</div>
+			<div class="flex items-center gap-2.5 text-slate-400">
 				<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
 					<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
 					<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
 				</svg>
-				<span class="text-sm">Cargando datos...</span>
+				<span class="text-sm font-medium">Cargando datos...</span>
 			</div>
 		</div>
 	{:else}
 		<!-- KPIs -->
-		<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-			<div class="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
-				<div class="flex items-center gap-2 mb-2">
-					<svg class="w-4 h-4 text-primary-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-					</svg>
-					<p class="text-xs text-gray-400">Actas Procesadas</p>
+		<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+			<div class="card-flat p-5 kpi-card" style="--kpi-color: #3b82f6">
+				<div class="flex items-center gap-2 mb-3">
+					<div class="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center">
+						<svg class="w-4 h-4 text-primary-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+						</svg>
+					</div>
+					<p class="text-[12px] font-semibold text-slate-500">Actas Procesadas</p>
 				</div>
-				<p class="text-2xl font-bold text-gray-900 tabular-nums">{actasProcesadas}</p>
-				<p class="text-xs text-gray-400 mt-1">de {totalMesas} mesas</p>
+				<p class="text-[28px] font-extrabold text-slate-900 tabular-nums leading-none">{actasProcesadas}</p>
+				<p class="text-[12px] text-slate-400 mt-2 font-medium">de {totalMesas} mesas</p>
 			</div>
 
-			<div class="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
-				<div class="flex items-center gap-2 mb-2">
-					<svg class="w-4 h-4 text-primary-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6a7.5 7.5 0 107.5 7.5h-7.5V6z" />
-						<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5H21A7.5 7.5 0 0013.5 3v7.5z" />
-					</svg>
-					<p class="text-xs text-gray-400">Cobertura</p>
+			<div class="card-flat p-5 kpi-card" style="--kpi-color: #2563eb">
+				<div class="flex items-center gap-2 mb-3">
+					<div class="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center">
+						<svg class="w-4 h-4 text-primary-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6a7.5 7.5 0 107.5 7.5h-7.5V6z" />
+							<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5H21A7.5 7.5 0 0013.5 3v7.5z" />
+						</svg>
+					</div>
+					<p class="text-[12px] font-semibold text-slate-500">Cobertura</p>
 				</div>
-				<p class="text-2xl font-bold text-primary-600 tabular-nums">{cobertura()}%</p>
-				<div class="mt-2 h-1 bg-gray-100 rounded-full overflow-hidden">
-					<div class="h-full bg-primary-500 rounded-full transition-all" style="width: {cobertura()}%"></div>
+				<p class="text-[28px] font-extrabold text-primary-600 tabular-nums leading-none">{cobertura()}%</p>
+				<div class="mt-3 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+					<div class="h-full bg-gradient-to-r from-primary-500 to-primary-400 rounded-full transition-all duration-700" style="width: {cobertura()}%"></div>
 				</div>
 			</div>
 
-			<div class="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
-				<div class="flex items-center gap-2 mb-2">
-					<svg class="w-4 h-4 text-primary-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-					</svg>
-					<p class="text-xs text-gray-400">Verificadas</p>
+			<div class="card-flat p-5 kpi-card" style="--kpi-color: #10b981">
+				<div class="flex items-center gap-2 mb-3">
+					<div class="w-8 h-8 rounded-lg bg-success-50 flex items-center justify-center">
+						<svg class="w-4 h-4 text-success-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+						</svg>
+					</div>
+					<p class="text-[12px] font-semibold text-slate-500">Verificadas</p>
 				</div>
-				<p class="text-2xl font-bold text-gray-900 tabular-nums">{actasVerificadas}</p>
-				<p class="text-xs text-gray-400 mt-1">
+				<p class="text-[28px] font-extrabold text-slate-900 tabular-nums leading-none">{actasVerificadas}</p>
+				<p class="text-[12px] text-slate-400 mt-2 font-medium">
 					{actasProcesadas > 0 ? ((actasVerificadas / actasProcesadas) * 100).toFixed(0) : 0}% del total
 				</p>
 			</div>
 
-			<div class="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
-				<div class="flex items-center gap-2 mb-2">
-					<svg class="w-4 h-4 text-primary-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
-					</svg>
-					<p class="text-xs text-gray-400">Total Votos</p>
+			<div class="card-flat p-5 kpi-card" style="--kpi-color: #8b5cf6">
+				<div class="flex items-center gap-2 mb-3">
+					<div class="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center">
+						<svg class="w-4 h-4 text-violet-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+						</svg>
+					</div>
+					<p class="text-[12px] font-semibold text-slate-500">Total Votos</p>
 				</div>
-				<p class="text-2xl font-bold text-gray-900 tabular-nums">
+				<p class="text-[28px] font-extrabold text-slate-900 tabular-nums leading-none">
 					{(totalVotosValidos + totalNulos + totalBlancos).toLocaleString('es-BO')}
 				</p>
-				<p class="text-xs text-gray-400 mt-1">
-					{totalNulos.toLocaleString('es-BO')} nulos · {totalBlancos.toLocaleString('es-BO')} blancos
+				<p class="text-[12px] text-slate-400 mt-2 font-medium">
+					{totalNulos.toLocaleString('es-BO')} nulos &middot; {totalBlancos.toLocaleString('es-BO')} blancos
 				</p>
 			</div>
 		</div>
@@ -524,25 +540,25 @@
 		<!-- Charts Row -->
 		<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
 			<!-- Resultados tabla -->
-			<div class="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
-				<h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Resultados por Partido</h2>
-				<div class="space-y-3">
+			<div class="card p-6">
+				<h2 class="section-title mb-5">Resultados por Partido</h2>
+				<div class="space-y-3.5">
 					{#each Object.values(resultados).sort((a, b) => b.votos - a.votos) as res, i}
 						<div>
-							<div class="flex items-center justify-between mb-1">
-								<div class="flex items-center gap-2">
-									<span class="text-xs font-bold text-gray-300 w-4">{i + 1}</span>
-									<span class="w-2.5 h-2.5 rounded-full" style="background-color: {res.color}"></span>
-									<span class="text-sm font-medium text-gray-900">{res.sigla}</span>
+							<div class="flex items-center justify-between mb-1.5">
+								<div class="flex items-center gap-2.5">
+									<span class="text-[11px] font-bold text-slate-300 w-4 tabular-nums">{i + 1}</span>
+									<span class="w-3 h-3 rounded-full shadow-sm" style="background-color: {res.color}"></span>
+									<span class="text-[13px] font-semibold text-slate-800">{res.sigla}</span>
 								</div>
-								<div class="text-right">
-									<span class="text-sm font-bold text-gray-900 tabular-nums">{pct(res.votos)}%</span>
-									<span class="text-xs text-gray-400 ml-1 tabular-nums">({res.votos.toLocaleString('es-BO')})</span>
+								<div class="text-right flex items-baseline gap-1.5">
+									<span class="text-[14px] font-extrabold text-slate-900 tabular-nums">{pct(res.votos)}%</span>
+									<span class="text-[11px] text-slate-400 tabular-nums font-medium">({res.votos.toLocaleString('es-BO')})</span>
 								</div>
 							</div>
-							<div class="h-1.5 bg-gray-50 rounded-full overflow-hidden ml-6">
+							<div class="h-2 bg-slate-50 rounded-full overflow-hidden ml-[26px]">
 								<div
-									class="h-full rounded-full transition-all duration-500"
+									class="h-full rounded-full transition-all duration-700 ease-out"
 									style="width: {pct(res.votos)}%; background-color: {res.color}"
 								></div>
 							</div>
@@ -552,16 +568,16 @@
 			</div>
 
 			<!-- Bar chart -->
-			<div class="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
-				<h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Votos por Partido</h2>
+			<div class="card p-6">
+				<h2 class="section-title mb-5">Votos por Partido</h2>
 				<div class="h-64">
 					<canvas id="barChart"></canvas>
 				</div>
 			</div>
 
 			<!-- Donut chart -->
-			<div class="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
-				<h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Distribucion</h2>
+			<div class="card p-6">
+				<h2 class="section-title mb-5">Distribucion</h2>
 				<div class="h-64">
 					<canvas id="donutChart"></canvas>
 				</div>
@@ -571,33 +587,35 @@
 		<!-- Map + Evolution Row -->
 		<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
 			<!-- Mapa -->
-			<div class="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
-				<div class="flex items-center justify-between mb-4">
-					<h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Mapa Electoral</h2>
-					<div class="flex items-center gap-1">
+			<div class="card p-6">
+				<div class="flex items-center justify-between mb-5">
+					<h2 class="section-title">Mapa Electoral</h2>
+					<div class="flex items-center gap-1.5 text-slate-400">
 						<svg class="w-3.5 h-3.5 text-primary-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
 							<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
 						</svg>
-						<span class="text-xs text-gray-400">Santa Cruz</span>
+						<span class="text-[12px] font-medium">Santa Cruz</span>
 					</div>
 				</div>
-				<div id="mapContainer" class="h-72 rounded-lg overflow-hidden bg-gray-50"></div>
+				<div id="mapContainer" class="h-72 rounded-xl overflow-hidden bg-slate-50 border border-slate-100"></div>
 			</div>
 
 			<!-- Evolucion temporal -->
-			<div class="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
-				<h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Evolucion del Conteo</h2>
+			<div class="card p-6">
+				<h2 class="section-title mb-5">Evolucion del Conteo</h2>
 				<div class="h-72">
 					{#if evolucion.length > 0}
 						<canvas id="lineChart"></canvas>
 					{:else}
 						<div class="flex items-center justify-center h-full">
 							<div class="text-center">
-								<svg class="w-8 h-8 text-gray-200 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor">
-									<path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75z" />
-								</svg>
-								<p class="text-xs text-gray-400">Se mostrara al procesar actas</p>
+								<div class="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center mx-auto mb-3">
+									<svg class="w-6 h-6 text-slate-300" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75z" />
+									</svg>
+								</div>
+								<p class="text-[13px] text-slate-400 font-medium">Se mostrara al procesar actas</p>
 							</div>
 						</div>
 					{/if}
@@ -607,34 +625,34 @@
 
 		<!-- Tabla por distrito -->
 		{#if !filtroDistrito && Object.keys(resultadosPorDistrito).length > 0}
-			<div class="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
-				<h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Resultados por Distrito</h2>
-				<div class="overflow-x-auto">
+			<div class="card p-6">
+				<h2 class="section-title mb-5">Resultados por Distrito</h2>
+				<div class="overflow-x-auto -mx-2">
 					<table class="w-full text-sm">
 						<thead>
-							<tr class="border-b border-gray-100">
-								<th class="text-left py-2.5 pr-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Distrito</th>
+							<tr class="border-b border-slate-100">
+								<th class="text-left py-3 pr-4 pl-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Distrito</th>
 								{#each partidos as p}
-									<th class="text-right py-2.5 px-2 text-xs font-semibold" style="color: {p.color}">
+									<th class="text-right py-3 px-2 text-[11px] font-bold uppercase tracking-wider" style="color: {p.color}">
 										{p.sigla}
 									</th>
 								{/each}
-								<th class="text-right py-2.5 pl-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Total</th>
+								<th class="text-right py-3 pl-3 pr-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total</th>
 							</tr>
 						</thead>
 						<tbody>
 							{#each Object.entries(resultadosPorDistrito) as [distrito, votos]}
 								{@const total = Object.values(votos).reduce((s, v) => s + v, 0)}
 								{@const maxVotos = Math.max(...Object.values(votos))}
-								<tr class="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
-									<td class="py-2.5 pr-4 text-xs text-gray-700 whitespace-nowrap font-medium">{distrito.replace('Distrito ', 'D')}</td>
+								<tr class="border-b border-slate-50 hover:bg-slate-50/80 transition-colors">
+									<td class="py-3 pr-4 pl-2 text-[12px] text-slate-700 whitespace-nowrap font-semibold">{distrito.replace('Distrito ', 'D')}</td>
 									{#each partidos as p}
 										{@const v = votos[p.sigla] ?? 0}
-										<td class="py-2.5 px-2 text-right text-xs tabular-nums {v === maxVotos && v > 0 ? 'font-bold text-gray-900' : 'text-gray-500'}">
+										<td class="py-3 px-2 text-right text-[12px] tabular-nums {v === maxVotos && v > 0 ? 'font-bold text-slate-900' : 'text-slate-400'}">
 											{v > 0 ? v.toLocaleString('es-BO') : '-'}
 										</td>
 									{/each}
-									<td class="py-2.5 pl-3 text-right text-xs font-semibold text-gray-900 tabular-nums">
+									<td class="py-3 pl-3 pr-2 text-right text-[12px] font-bold text-slate-900 tabular-nums">
 										{total > 0 ? total.toLocaleString('es-BO') : '-'}
 									</td>
 								</tr>

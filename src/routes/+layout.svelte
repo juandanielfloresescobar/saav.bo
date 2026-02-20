@@ -59,6 +59,7 @@
 
 	let currentPath = $derived($page.url.pathname);
 	let isAuthPage = $derived(currentPath === '/auth');
+	let initials = $derived(perfil?.nombre?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() ?? '');
 </script>
 
 <svelte:head>
@@ -66,42 +67,43 @@
 </svelte:head>
 
 {#if session && !isAuthPage}
-	<div class="min-h-screen flex flex-col bg-white">
+	<div class="min-h-screen flex flex-col">
 		<!-- Header -->
-		<header class="bg-white border-b border-gray-100 sticky top-0 z-50">
+		<header class="sticky top-0 z-50 bg-white/80 glass border-b border-slate-200/60">
 			<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-				<div class="flex justify-between items-center h-14">
-					<div class="flex items-center gap-8">
-						<a href="/" class="flex items-center gap-2.5">
-							<div class="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
-								<span class="text-white font-bold text-sm">Q</span>
+				<div class="flex justify-between items-center h-16">
+					<!-- Logo + Nav -->
+					<div class="flex items-center gap-10">
+						<a href="/" class="flex items-center gap-3 group">
+							<div class="w-9 h-9 rounded-xl bg-gradient-to-br from-primary-600 to-primary-800 flex items-center justify-center shadow-sm shadow-primary-600/20 group-hover:shadow-md group-hover:shadow-primary-600/30 transition-shadow">
+								<span class="text-white font-extrabold text-sm tracking-tight">Q</span>
 							</div>
-							<div class="flex items-center gap-2">
-								<span class="text-base font-bold text-gray-900 tracking-tight">Quantis</span>
-								<span class="hidden sm:inline text-[11px] text-gray-400 font-medium uppercase tracking-wider">Control Electoral</span>
+							<div class="flex flex-col">
+								<span class="text-[15px] font-bold text-slate-900 leading-tight tracking-tight">Quantis</span>
+								<span class="hidden sm:block text-[10px] text-slate-400 font-semibold uppercase tracking-[0.12em] leading-tight">Control Electoral</span>
 							</div>
 						</a>
 
-						<nav class="hidden sm:flex items-center gap-1">
+						<nav class="hidden sm:flex items-center gap-0.5">
 							{#each navItems as item}
 								{@const active = currentPath.startsWith(item.href)}
 								<a
 									href={item.href}
-									class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px] font-medium transition-all
+									class="flex items-center gap-2 px-3.5 py-2 rounded-xl text-[13px] font-semibold transition-all
 										{active
-											? 'bg-primary-50 text-primary-700'
-											: 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'}"
+											? 'bg-primary-50 text-primary-700 shadow-sm shadow-primary-100'
+											: 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}"
 								>
 									{#if item.icon === 'clipboard'}
-										<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+										<svg class="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke-width={active ? 2 : 1.5} stroke="currentColor">
 											<path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9.75a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
 										</svg>
 									{:else if item.icon === 'shield'}
-										<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+										<svg class="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke-width={active ? 2 : 1.5} stroke="currentColor">
 											<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
 										</svg>
 									{:else if item.icon === 'chart'}
-										<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+										<svg class="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke-width={active ? 2 : 1.5} stroke="currentColor">
 											<path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
 										</svg>
 									{/if}
@@ -111,17 +113,25 @@
 						</nav>
 					</div>
 
+					<!-- User -->
 					<div class="flex items-center gap-3">
-						<div class="hidden sm:flex flex-col items-end">
-							<span class="text-[13px] font-semibold text-gray-900">{perfil?.nombre}</span>
-							<span class="text-[11px] text-gray-400 capitalize">{perfil?.rol}</span>
+						<div class="hidden sm:flex items-center gap-3">
+							<div class="flex flex-col items-end">
+								<span class="text-[13px] font-semibold text-slate-800">{perfil?.nombre}</span>
+								<span class="text-[11px] text-slate-400 capitalize font-medium">{perfil?.rol}</span>
+							</div>
+							<div class="w-8 h-8 rounded-full bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center">
+								<span class="text-[11px] font-bold text-primary-700">{initials}</span>
+							</div>
 						</div>
+						<div class="w-px h-6 bg-slate-200 hidden sm:block"></div>
 						<button
 							onclick={logout}
-							class="text-gray-400 hover:text-gray-600 p-1.5 rounded-md hover:bg-gray-50 transition-colors"
+							class="text-slate-400 hover:text-slate-600 p-2 rounded-lg hover:bg-slate-50 transition-all"
 							title="Cerrar sesion"
+							aria-label="Cerrar sesion"
 						>
-							<svg class="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+							<svg class="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
 								<path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
 							</svg>
 						</button>
@@ -131,36 +141,39 @@
 		</header>
 
 		<!-- Mobile bottom nav -->
-		<nav class="sm:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 z-50 safe-area-bottom">
-			<div class="flex justify-around py-1.5 px-2">
+		<nav class="sm:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/90 glass border-t border-slate-200/60 safe-area-bottom">
+			<div class="flex justify-around py-1 px-2">
 				{#each navItems as item}
 					{@const active = currentPath.startsWith(item.href)}
 					<a
 						href={item.href}
-						class="flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-lg text-[11px] font-medium transition-colors
-							{active ? 'text-primary-600' : 'text-gray-400'}"
+						class="flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl transition-all
+							{active ? 'text-primary-600' : 'text-slate-400 active:text-slate-600'}"
 					>
+						{#if active}
+							<div class="absolute -top-px left-1/2 -translate-x-1/2 w-8 h-0.5 bg-primary-500 rounded-full"></div>
+						{/if}
 						{#if item.icon === 'clipboard'}
-							<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+							<svg class="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke-width={active ? 2 : 1.5} stroke="currentColor">
 								<path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9.75a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
 							</svg>
 						{:else if item.icon === 'shield'}
-							<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+							<svg class="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke-width={active ? 2 : 1.5} stroke="currentColor">
 								<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
 							</svg>
 						{:else if item.icon === 'chart'}
-							<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+							<svg class="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke-width={active ? 2 : 1.5} stroke="currentColor">
 								<path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
 							</svg>
 						{/if}
-						{item.label}
+						<span class="text-[11px] font-semibold">{item.label}</span>
 					</a>
 				{/each}
 			</div>
 		</nav>
 
 		<!-- Content -->
-		<main class="flex-1 pb-16 sm:pb-0">
+		<main class="flex-1 pb-20 sm:pb-0">
 			{@render children()}
 		</main>
 	</div>
