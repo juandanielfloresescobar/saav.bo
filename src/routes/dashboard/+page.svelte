@@ -1,14 +1,16 @@
 <script lang="ts">
 	import { onMount, onDestroy, tick } from 'svelte';
 	import { Chart, registerables } from 'chart.js';
+	import type { Partido, Distrito, ResultadoPartido, EvolucionEntry } from '$lib/types/database';
+
 
 	Chart.register(...registerables);
 
 	let { data } = $props();
 
 	// Estado
-	let partidos: any[] = $state([]);
-	let distritos: any[] = $state([]);
+	let partidos: Partido[] = $state([]);
+	let distritos: Distrito[] = $state([]);
 	let filtroDistrito = $state('');
 	let totalMesas = $state(0);
 	let actasProcesadas = $state(0);
@@ -26,7 +28,17 @@
 	let donutChart: Chart | null = null;
 	let lineChart: Chart | null = null;
 	let channel: any = null;
-	let map: any = null;
+	let map: import('leaflet').Map | null = null;
+
+	// Sanitize text for safe HTML insertion (prevent XSS)
+	function escapeHtml(text: string): string {
+		const div = document.createElement('div');
+		div.textContent = text;
+		return div.innerHTML;
+	}
+
+	// Debounce timer for realtime updates
+	let recalculateTimer: ReturnType<typeof setTimeout> | null = null;
 
 	// District coordinates for Santa Cruz de la Sierra
 	const districtCoords: Record<string, [number, number]> = {
@@ -70,6 +82,7 @@
 	});
 
 	onDestroy(() => {
+		if (recalculateTimer) clearTimeout(recalculateTimer);
 		if (channel) data.supabase.removeChannel(channel);
 		barChart?.destroy();
 		donutChart?.destroy();
@@ -77,19 +90,30 @@
 		if (map) map.remove();
 	});
 
+	let loadError = $state('');
+
 	async function loadInitialData() {
 		loading = true;
+		loadError = '';
 
-		const [partidosRes, distritosRes] = await Promise.all([
-			data.supabase.from('partidos').select('*').order('orden'),
-			data.supabase.from('distritos').select('*').order('numero')
-		]);
+		try {
+			const [partidosRes, distritosRes] = await Promise.all([
+				data.supabase.from('partidos').select('*').order('orden'),
+				data.supabase.from('distritos').select('*').order('numero')
+			]);
 
-		partidos = partidosRes.data ?? [];
-		distritos = distritosRes.data ?? [];
+			if (partidosRes.error) throw partidosRes.error;
+			if (distritosRes.error) throw distritosRes.error;
 
-		await recalculate();
-		loading = false;
+			partidos = partidosRes.data ?? [];
+			distritos = distritosRes.data ?? [];
+
+			await recalculate();
+		} catch {
+			loadError = 'Error al cargar datos. Intenta recargar la pagina.';
+		} finally {
+			loading = false;
+		}
 	}
 
 	async function recalculate() {
@@ -105,7 +129,7 @@
 
 	}
 
-	function applyRpcData(stats: any) {
+	function applyRpcData(stats: Record<string, any>) {
 		totalMesas = stats.total_mesas ?? 0;
 		actasProcesadas = stats.actas?.procesadas ?? 0;
 		actasVerificadas = stats.actas?.verificadas ?? 0;
@@ -119,7 +143,7 @@
 		resultados = res;
 		totalVotosValidos = Object.values(res).reduce((s, r) => s + r.votos, 0);
 
-		evolucion = (stats.evolucion ?? []).map((e: any) => ({ hora: e.hora, actas: e.actas }));
+		evolucion = (stats.evolucion ?? []).map((e: { hora: string; actas: number }) => ({ hora: e.hora, actas: e.actas }));
 
 		if (!filtroDistrito && stats.por_distrito) {
 			const distRes: Record<string, Record<string, number>> = {};
@@ -132,6 +156,7 @@
 
 	async function recalculateLegacy() {
 		const mesasCount = await data.supabase.from('mesas').select('*', { count: 'exact', head: true });
+		if (mesasCount.error) throw new Error('Error al contar mesas');
 		totalMesas = mesasCount.count ?? 0;
 
 		let actasQuery = data.supabase
@@ -145,19 +170,21 @@
 			actasQuery = actasQuery.eq('mesas.recintos.distrito_id', filtroDistrito);
 		}
 
-		const { data: actasData, count: actasCount } = await actasQuery;
+		const { data: actasData, count: actasCount, error: actasError } = await actasQuery;
+		if (actasError) throw new Error('Error al cargar actas');
 		actasProcesadas = actasCount ?? 0;
-		actasVerificadas = actasData?.filter((a: any) => a.estado === 'verificada').length ?? 0;
-		totalNulos = actasData?.reduce((s: number, a: any) => s + a.votos_nulos, 0) ?? 0;
-		totalBlancos = actasData?.reduce((s: number, a: any) => s + a.votos_blancos, 0) ?? 0;
+		actasVerificadas = actasData?.filter((a) => a.estado === 'verificada').length ?? 0;
+		totalNulos = actasData?.reduce((s: number, a) => s + a.votos_nulos, 0) ?? 0;
+		totalBlancos = actasData?.reduce((s: number, a) => s + a.votos_blancos, 0) ?? 0;
 
-		const actaIds = actasData?.map((a: any) => a.id) ?? [];
+		const actaIds = actasData?.map((a) => a.id) ?? [];
 		const res: Record<string, { sigla: string; color: string; votos: number }> = {};
 		for (const p of partidos) res[p.id] = { sigla: p.sigla, color: p.color, votos: 0 };
 
 		if (actaIds.length > 0) {
-			const { data: votosData } = await data.supabase
+			const { data: votosData, error: votosError } = await data.supabase
 				.from('votos').select('partido_id, cantidad').in('acta_id', actaIds);
+			if (votosError) throw new Error('Error al cargar votos');
 			for (const v of votosData ?? []) {
 				if (res[v.partido_id]) res[v.partido_id].votos += v.cantidad;
 			}
@@ -168,7 +195,7 @@
 		const evoMap = new Map<string, number>();
 		let runningCount = 0;
 		const sorted = [...(actasData ?? [])].sort(
-			(a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+			(a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
 		);
 		for (const acta of sorted) {
 			runningCount++;
@@ -184,13 +211,14 @@
 				for (const p of partidos) distRes[d.nombre][p.sigla] = 0;
 			}
 			if (actaIds.length > 0) {
-				const { data: votosConActa } = await data.supabase
+				const { data: votosConActa, error: votosDistError } = await data.supabase
 					.from('votos')
 					.select('partido_id, cantidad, actas!inner(mesas!inner(recintos!inner(distritos!inner(nombre))))')
 					.in('acta_id', actaIds);
+				if (votosDistError) throw new Error('Error al cargar votos por distrito');
 				for (const v of votosConActa ?? []) {
 					const distNombre = (v as any).actas?.mesas?.recintos?.distritos?.nombre;
-					const partido = partidos.find((p: any) => p.id === v.partido_id);
+					const partido = partidos.find((p) => p.id === v.partido_id);
 					if (distNombre && partido && distRes[distNombre]) distRes[distNombre][partido.sigla] += v.cantidad;
 				}
 			}
@@ -295,7 +323,7 @@
 		const mapContainer = document.getElementById('mapContainer');
 		if (!mapContainer || Object.keys(resultadosPorDistrito).length === 0) return;
 
-		const L = (await import('leaflet')).default;
+		const L = await import('leaflet');
 
 		if (map) map.remove();
 
@@ -331,37 +359,48 @@
 				}
 			}
 
-			const partido = partidos.find((p: any) => p.sigla === leadParty);
+			const partido = partidos.find((p) => p.sigla === leadParty);
 			const color = partido?.color ?? '#6b7280';
+			const safeColor = color.replace(/[^#a-fA-F0-9]/g, '');
 			const radius = Math.max(300, Math.min(1200, totalDistVotes / 3));
+			const safeDistName = escapeHtml(distName.replace('Distrito ', 'D'));
+			const safeLeadParty = escapeHtml(leadParty);
+			const pctStr = totalDistVotes > 0 ? ((leadVotes / totalDistVotes) * 100).toFixed(1) : '0';
 
 			L.circle(coords, {
 				radius,
-				color: color,
-				fillColor: color,
+				color: safeColor,
+				fillColor: safeColor,
 				fillOpacity: 0.25,
 				weight: 2
 			}).addTo(map).bindPopup(`
 				<div style="font-family:Inter,sans-serif;min-width:140px">
-					<div style="font-weight:700;font-size:13px;margin-bottom:4px">${distName.replace('Distrito ', 'D')}</div>
+					<div style="font-weight:700;font-size:13px;margin-bottom:4px">${safeDistName}</div>
 					<div style="font-size:12px;color:#6b7280;margin-bottom:6px">${totalDistVotes.toLocaleString('es-BO')} votos</div>
 					<div style="font-size:12px">
-						<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:4px"></span>
-						<strong>${leadParty}</strong> — ${leadVotes.toLocaleString('es-BO')} (${totalDistVotes > 0 ? ((leadVotes / totalDistVotes) * 100).toFixed(1) : 0}%)
+						<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${safeColor};margin-right:4px"></span>
+						<strong>${safeLeadParty}</strong> — ${leadVotes.toLocaleString('es-BO')} (${pctStr}%)
 					</div>
 				</div>
 			`);
 		}
 	}
 
+	function debouncedRecalculate() {
+		if (recalculateTimer) clearTimeout(recalculateTimer);
+		recalculateTimer = setTimeout(() => {
+			recalculate();
+		}, 500);
+	}
+
 	function setupRealtime() {
 		channel = data.supabase
 			.channel('dashboard-live')
 			.on('postgres_changes', { event: '*', schema: 'public', table: 'actas' }, () => {
-				recalculate();
+				debouncedRecalculate();
 			})
 			.on('postgres_changes', { event: '*', schema: 'public', table: 'votos' }, () => {
-				recalculate();
+				debouncedRecalculate();
 			})
 			.subscribe();
 	}
@@ -396,6 +435,7 @@
 			<select
 				bind:value={filtroDistrito}
 				onchange={handleFiltroChange}
+				aria-label="Filtrar por distrito"
 				class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
 			>
 				<option value="">Todos los distritos</option>
@@ -409,6 +449,10 @@
 			</span>
 		</div>
 	</div>
+
+	{#if loadError}
+		<div class="bg-red-50 text-red-600 text-sm rounded-lg px-4 py-3 mb-4">{loadError}</div>
+	{/if}
 
 	{#if loading}
 		<div class="flex items-center justify-center py-20">

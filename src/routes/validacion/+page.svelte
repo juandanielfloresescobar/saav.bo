@@ -1,17 +1,20 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import type { Acta, VotoDisplay, Distrito, EstadoActa, EstadoCounts } from '$lib/types/database';
+	import { ESTADOS } from '$lib/types/database';
 
 	let { data } = $props();
 
-	let actas: any[] = $state([]);
-	let selectedActa: any = $state(null);
-	let votosActa: any[] = $state([]);
-	let filtroEstado = $state('pendiente');
+	let actas: Acta[] = $state([]);
+	let selectedActa: Acta | null = $state(null);
+	let votosActa: VotoDisplay[] = $state([]);
+	let filtroEstado: EstadoActa = $state('pendiente');
 	let filtroDistrito = $state('');
-	let distritos: any[] = $state([]);
+	let distritos: Distrito[] = $state([]);
 	let loading = $state(false);
+	let pageError = $state('');
 	let observaciones = $state('');
-	let counts = $state({ pendiente: 0, verificada: 0, observada: 0, rechazada: 0 });
+	let counts: EstadoCounts = $state({ pendiente: 0, verificada: 0, observada: 0, rechazada: 0 });
 	let hasMore = $state(false);
 	const PAGE_SIZE = 50;
 
@@ -20,8 +23,8 @@
 	});
 
 	async function loadDistritos() {
-		const { data: d } = await data.supabase.from('distritos').select('*').order('numero');
-		distritos = d ?? [];
+		const { data: d, error: distError } = await data.supabase.from('distritos').select('*').order('numero');
+		if (!distError) distritos = d ?? [];
 	}
 
 	async function loadCounts() {
@@ -33,7 +36,7 @@
 			const fresh = { pendiente: 0, verificada: 0, observada: 0, rechazada: 0 };
 			for (const row of rpcData) {
 				if (row.estado in fresh) {
-					(fresh as any)[row.estado] = Number(row.count);
+					fresh[row.estado as EstadoActa] = Number(row.count);
 				}
 			}
 			counts = fresh;
@@ -67,33 +70,44 @@
 			query = query.eq('mesas.recintos.distrito_id', filtroDistrito);
 		}
 
-		const { data: result } = await query;
+		const { data: result, error: queryError } = await query;
+		if (queryError) {
+			pageError = 'Error al cargar actas. Intenta de nuevo.';
+			loading = false;
+			return;
+		}
 		const fetched = result ?? [];
 		hasMore = fetched.length === PAGE_SIZE;
 
 		if (append) {
-			actas = [...actas, ...fetched];
+			actas = [...actas, ...(fetched as unknown as Acta[])];
 		} else {
-			actas = fetched;
+			actas = fetched as unknown as Acta[];
 		}
 		loading = false;
 	}
 
-	async function selectActa(acta: any) {
+	async function selectActa(acta: Acta) {
 		selectedActa = acta;
 		observaciones = acta.observaciones ?? '';
-		const { data: v } = await data.supabase
+		pageError = '';
+		const { data: v, error: votosError } = await data.supabase
 			.from('votos')
 			.select('cantidad, partidos(sigla, color)')
 			.eq('acta_id', acta.id);
-		votosActa = v ?? [];
+		if (votosError) {
+			pageError = 'Error al cargar los votos del acta.';
+			return;
+		}
+		votosActa = (v ?? []) as unknown as VotoDisplay[];
 	}
 
-	async function updateEstado(nuevoEstado: string) {
+	async function updateEstado(nuevoEstado: EstadoActa) {
 		if (!selectedActa) return;
 		loading = true;
+		pageError = '';
 
-		await data.supabase
+		const { data: updated, error: updateError } = await data.supabase
 			.from('actas')
 			.update({
 				estado: nuevoEstado,
@@ -101,7 +115,24 @@
 				observaciones: observaciones || null,
 				updated_at: new Date().toISOString()
 			})
-			.eq('id', selectedActa.id);
+			.eq('id', selectedActa.id)
+			.eq('estado', selectedActa.estado)
+			.select();
+
+		if (updateError) {
+			pageError = 'Error al actualizar el acta. Intenta de nuevo.';
+			loading = false;
+			return;
+		}
+
+		if (!updated || updated.length === 0) {
+			pageError = 'El acta fue modificada por otro usuario. Recargando...';
+			selectedActa = null;
+			votosActa = [];
+			await Promise.all([loadActas(), loadCounts()]);
+			loading = false;
+			return;
+		}
 
 		selectedActa = null;
 		votosActa = [];
@@ -141,10 +172,10 @@
 
 	<!-- Contadores -->
 	<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-		{#each ['pendiente', 'verificada', 'observada', 'rechazada'] as estado}
+		{#each ESTADOS as estado}
 			{@const active = filtroEstado === estado}
 			<button
-				onclick={() => { filtroEstado = estado; loadActas(); }}
+				onclick={() => { filtroEstado = estado as EstadoActa; loadActas(); }}
 				class="bg-white rounded-xl border p-4 text-left transition-all shadow-sm
 					{active ? 'border-primary-500 ring-1 ring-primary-200' : 'border-gray-100 hover:border-gray-200'}"
 			>
@@ -155,6 +186,10 @@
 			</button>
 		{/each}
 	</div>
+
+	{#if pageError}
+		<div class="bg-red-50 text-red-600 text-sm rounded-lg px-4 py-3 mb-4">{pageError}</div>
+	{/if}
 
 	<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 		<!-- Lista de actas -->
@@ -205,7 +240,7 @@
 					Verificar — Mesa {selectedActa.mesas?.numero}
 				</h3>
 
-				{#if selectedActa.foto_url}
+				{#if selectedActa.foto_url && selectedActa.foto_url.startsWith('https://')}
 					<div class="mb-4">
 						<img
 							src={selectedActa.foto_url}
@@ -259,21 +294,21 @@
 
 				<div class="grid grid-cols-3 gap-2">
 					<button
-						onclick={() => updateEstado('verificada')}
+						onclick={() => updateEstado('verificada' as EstadoActa)}
 						disabled={loading}
 						class="bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium py-2.5 rounded-lg transition-colors disabled:opacity-50"
 					>
 						Verificar
 					</button>
 					<button
-						onclick={() => updateEstado('observada')}
+						onclick={() => updateEstado('observada' as EstadoActa)}
 						disabled={loading}
 						class="bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-medium py-2.5 rounded-lg transition-colors disabled:opacity-50"
 					>
 						Observar
 					</button>
 					<button
-						onclick={() => updateEstado('rechazada')}
+						onclick={() => updateEstado('rechazada' as EstadoActa)}
 						disabled={loading}
 						class="bg-white border border-danger-200 hover:bg-danger-50 text-danger-600 text-sm font-medium py-2.5 rounded-lg transition-colors disabled:opacity-50"
 					>

@@ -3,11 +3,12 @@
 	import { compressActaPhoto } from '$lib/utils/compress';
 	import { validateActa } from '$lib/utils/validators';
 	import { savePendingActa, getPendingActas, removePendingActa, isOnline } from '$lib/utils/offline';
+	import type { Partido, Mesa, Acta } from '$lib/types/database';
 
 	let { data } = $props();
 
-	let mesas: any[] = $state([]);
-	let partidos: any[] = $state([]);
+	let mesas: Mesa[] = $state([]);
+	let partidos: Partido[] = $state([]);
 	let selectedMesa = $state('');
 	let fotoFile: File | null = $state(null);
 	let fotoPreview = $state('');
@@ -19,7 +20,7 @@
 	let loading = $state(false);
 	let success = $state('');
 	let error = $state('');
-	let historial: any[] = $state([]);
+	let historial: Acta[] = $state([]);
 	let pendingCount = $state(0);
 	let online = $state(true);
 	let validation = $derived(validateActa(votos, votosNulos, votosBlancos, totalVotantes));
@@ -40,25 +41,32 @@
 	async function loadData() {
 		const recintoId = data.perfil?.recinto_id;
 
-		const [mesasRes, partidosRes] = await Promise.all([
-			recintoId
-				? data.supabase
-						.from('mesas')
-						.select('id, numero, recinto_id, total_habilitados, recintos!inner(nombre)')
-						.eq('recinto_id', recintoId)
-						.order('numero')
-				: Promise.resolve({ data: [] }),
-			data.supabase.from('partidos').select('*').order('orden')
-		]);
+		try {
+			const [mesasRes, partidosRes] = await Promise.all([
+				recintoId
+					? data.supabase
+							.from('mesas')
+							.select('id, numero, recinto_id, total_habilitados, recintos!inner(nombre)')
+							.eq('recinto_id', recintoId)
+							.order('numero')
+					: Promise.resolve({ data: [], error: null }),
+				data.supabase.from('partidos').select('*').order('orden')
+			]);
 
-		mesas = mesasRes.data ?? [];
-		partidos = partidosRes.data ?? [];
+			if (mesasRes.error) throw mesasRes.error;
+			if (partidosRes.error) throw partidosRes.error;
 
-		const v: Record<string, number> = {};
-		for (const p of partidos) {
-			v[p.id] = 0;
+			mesas = (mesasRes.data ?? []) as Mesa[];
+			partidos = partidosRes.data ?? [];
+
+			const v: Record<string, number> = {};
+			for (const p of partidos) {
+				v[p.id] = 0;
+			}
+			votos = v;
+		} catch {
+			error = 'Error al cargar datos iniciales. Verifica tu conexion.';
 		}
-		votos = v;
 	}
 
 	async function loadHistorial() {
@@ -68,12 +76,12 @@
 			return;
 		}
 
-		const { data: actas } = await data.supabase
+		const { data: actas, error: historialError } = await data.supabase
 			.from('actas')
 			.select('id, mesa_id, estado, created_at, mesas(numero)')
 			.eq('delegado_id', perfilId)
 			.order('created_at', { ascending: false });
-		historial = actas ?? [];
+		if (!historialError) historial = (actas ?? []) as unknown as Acta[];
 
 		const pending = await getPendingActas();
 		pendingCount = pending.length;
@@ -98,18 +106,28 @@
 	async function syncPending() {
 		if (!online) return;
 		const pending = await getPendingActas();
+		let syncErrors = 0;
 		for (const acta of pending) {
 			try {
 				await submitToSupabase(acta);
 				await removePendingActa(acta.id);
-			} catch {
-				break;
+			} catch (err: unknown) {
+				syncErrors++;
+				// Skip duplicate errors (already synced) and remove them
+				if (err && typeof err === 'object' && 'code' in err && err.code === '23505') {
+					await removePendingActa(acta.id);
+					syncErrors--;
+				}
+				// Continue trying other actas instead of stopping
 			}
 		}
 		pendingCount = (await getPendingActas()).length;
+		if (syncErrors > 0 && pendingCount > 0) {
+			error = `${syncErrors} acta(s) no se pudieron sincronizar. Se reintentara automaticamente.`;
+		}
 	}
 
-	async function submitToSupabase(actaData: any) {
+	async function submitToSupabase(actaData: Record<string, any>) {
 		let fotoUrl = null;
 		if (actaData.foto) {
 			const fileName = `${data.session?.user.id}/${Date.now()}.jpg`;
@@ -201,7 +219,8 @@
 				pendingCount++;
 				resetForm();
 			} else {
-				error = msg || 'Error al enviar el acta.';
+				error = 'Error al enviar el acta. Intenta de nuevo.';
+				console.error('Submit error:', err);
 			}
 		}
 		loading = false;

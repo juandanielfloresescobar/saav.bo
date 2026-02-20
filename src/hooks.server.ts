@@ -1,7 +1,14 @@
 import { createServerClient } from '@supabase/ssr';
-import { type Handle, redirect } from '@sveltejs/kit';
+import { type Handle, redirect, error } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
 import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
+
+// Validate required environment variables at startup
+if (!PUBLIC_SUPABASE_URL || !PUBLIC_SUPABASE_ANON_KEY) {
+	throw new Error(
+		'Missing required environment variables: PUBLIC_SUPABASE_URL and PUBLIC_SUPABASE_ANON_KEY must be set'
+	);
+}
 
 const supabase: Handle = async ({ event, resolve }) => {
 	event.locals.supabase = createServerClient(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY, {
