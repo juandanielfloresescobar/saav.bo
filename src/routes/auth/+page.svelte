@@ -19,20 +19,21 @@
 		});
 
 		if (authError) {
-			error = 'Credenciales invalidas. Contacta al administrador.';
+			error = 'Credenciales inválidas. Contacta al administrador.';
 			loading = false;
 			return;
 		}
 
-		goto('/');
+		// Full reload ensures server-side cookies are set before layout.server.ts runs
+		window.location.href = '/';
 	}
 </script>
 
 <svelte:head>
-	<title>Quantis - Iniciar Sesion</title>
+	<title>Quantis - Iniciar Sesión</title>
 </svelte:head>
 
-<div class="min-h-screen flex">
+<div class="min-h-screen flex bg-surface">
 	<!-- Left panel - Brand -->
 	<div class="hidden lg:flex lg:w-[45%] relative bg-gradient-to-br from-primary-800 via-primary-900 to-primary-900 overflow-hidden">
 		<!-- Decorative elements -->
@@ -61,7 +62,7 @@
 						<span class="text-primary-300">en tiempo real</span>
 					</h2>
 					<p class="text-primary-200/70 text-base mt-4 max-w-sm leading-relaxed">
-						Plataforma de monitoreo y verificacion de actas electorales para garantizar la transparencia del proceso democratico.
+						Plataforma de monitoreo y verificación de actas electorales para garantizar la transparencia del proceso democrático.
 					</p>
 				</div>
 
@@ -92,9 +93,9 @@
 	</div>
 
 	<!-- Right panel - Form -->
-	<div class="flex-1 flex items-center justify-center px-6 py-12 auth-pattern">
+	<div class="flex-1 flex items-center justify-center px-5 py-12 auth-pattern">
 		<div class="w-full max-w-sm animate-in">
-			<!-- Mobile logo -->
+			<!-- Logo -->
 			<div class="text-center mb-10">
 				<div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-600 to-primary-800 flex items-center justify-center mx-auto mb-5 shadow-lg shadow-primary-600/20">
 					<span class="text-white font-extrabold text-2xl">Q</span>
@@ -117,7 +118,7 @@
 			<form onsubmit={handleLogin} class="space-y-5">
 				<div>
 					<label for="email" class="block text-[13px] font-semibold text-slate-700 mb-2">
-						Correo electronico
+						Correo electrónico
 					</label>
 					<input
 						id="email"
@@ -131,14 +132,14 @@
 
 				<div>
 					<label for="password" class="block text-[13px] font-semibold text-slate-700 mb-2">
-						Contrasena
+						Contraseña
 					</label>
 					<input
 						id="password"
 						type="password"
 						bind:value={password}
 						required
-						placeholder="Tu contrasena"
+						placeholder="Tu contraseña"
 						class="input"
 					/>
 				</div>

@@ -65,7 +65,7 @@
 			}
 			votos = v;
 		} catch {
-			error = 'Error al cargar datos iniciales. Verifica tu conexion.';
+			error = 'Error al cargar datos iniciales. Verifica tu conexión.';
 		}
 	}
 
@@ -193,7 +193,7 @@
 
 		if (!online) {
 			await savePendingActa(actaData);
-			success = 'Acta guardada localmente. Se enviara cuando haya conexion.';
+			success = 'Acta guardada localmente. Se enviará cuando haya conexión.';
 			pendingCount++;
 			resetForm();
 			loading = false;
@@ -214,7 +214,7 @@
 			} else if (code === '42501' || msg.includes('policy')) {
 				error = 'No tienes permisos para registrar actas en esta mesa.';
 			} else if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || !navigator.onLine) {
-				error = 'Error de conexion. Guardando acta localmente...';
+				error = 'Error de conexión. Guardando acta localmente...';
 				await savePendingActa(actaData);
 				pendingCount++;
 				resetForm();
@@ -245,10 +245,10 @@
 
 <div class="max-w-2xl mx-auto px-4 py-8 animate-in">
 	<!-- Header -->
-	<div class="flex items-center justify-between mb-8">
+	<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-8">
 		<div>
-			<h1 class="text-xl font-extrabold text-slate-900 tracking-tight">Ingesta de Actas</h1>
-			<p class="text-[13px] text-slate-400 mt-1 font-medium">Registra los datos del acta electoral</p>
+			<h1 class="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight">Ingesta de Actas</h1>
+			<p class="text-[12px] sm:text-[13px] text-slate-400 mt-0.5 font-medium">Registra los datos del acta electoral</p>
 		</div>
 		<div class="flex items-center gap-2">
 			{#if pendingCount > 0}
@@ -261,7 +261,7 @@
 			{/if}
 			<div class="badge {online ? 'bg-primary-50 border border-primary-100 text-primary-600' : 'bg-slate-100 border border-slate-200 text-slate-500'}">
 				<span class="w-2 h-2 rounded-full {online ? 'bg-primary-500 live-dot' : 'bg-slate-400'}"></span>
-				{online ? 'En linea' : 'Sin conexion'}
+				{online ? 'En línea' : 'Sin conexión'}
 			</div>
 		</div>
 	</div>

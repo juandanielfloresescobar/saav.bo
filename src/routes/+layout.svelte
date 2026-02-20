@@ -41,7 +41,7 @@
 				return [{ href: '/ingesta', label: 'Ingesta', icon: 'clipboard' }];
 			case 'verificador':
 				return [
-					{ href: '/validacion', label: 'Validacion', icon: 'shield' },
+					{ href: '/validacion', label: 'Validación', icon: 'shield' },
 					{ href: '/dashboard', label: 'Dashboard', icon: 'chart' }
 				];
 			case 'candidato':
@@ -49,7 +49,7 @@
 			case 'admin':
 				return [
 					{ href: '/ingesta', label: 'Ingesta', icon: 'clipboard' },
-					{ href: '/validacion', label: 'Validacion', icon: 'shield' },
+					{ href: '/validacion', label: 'Validación', icon: 'shield' },
 					{ href: '/dashboard', label: 'Dashboard', icon: 'chart' }
 				];
 			default:
@@ -128,8 +128,8 @@
 						<button
 							onclick={logout}
 							class="text-slate-400 hover:text-slate-600 p-2 rounded-lg hover:bg-slate-50 transition-all"
-							title="Cerrar sesion"
-							aria-label="Cerrar sesion"
+							title="Cerrar sesión"
+							aria-label="Cerrar sesión"
 						>
 							<svg class="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
 								<path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
@@ -147,7 +147,7 @@
 					{@const active = currentPath.startsWith(item.href)}
 					<a
 						href={item.href}
-						class="flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl transition-all
+						class="relative flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl transition-all
 							{active ? 'text-primary-600' : 'text-slate-400 active:text-slate-600'}"
 					>
 						{#if active}

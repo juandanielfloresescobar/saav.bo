@@ -44,8 +44,8 @@
 	const districtCoords: Record<string, [number, number]> = {
 		'Distrito 1 - Casco Viejo': [-17.7833, -63.1822],
 		'Distrito 2 - Norte': [-17.7650, -63.1820],
-		'Distrito 3 - Estacion Argentina': [-17.7920, -63.1680],
-		'Distrito 4 - El Bajio': [-17.8050, -63.1830],
+		'Distrito 3 - Estación Argentina': [-17.7920, -63.1680],
+		'Distrito 4 - El Bajío': [-17.8050, -63.1830],
 		'Distrito 5 - Pampa de la Isla': [-17.7780, -63.1530],
 		'Distrito 6 - Villa 1ro de Mayo': [-17.7980, -63.1480],
 		'Distrito 7 - UV Guaracachi': [-17.8150, -63.1600],
@@ -56,7 +56,7 @@
 		'Distrito 12 - La Guardia': [-17.8500, -63.1900],
 		'Distrito 13 - Nuevo Palmar': [-17.8300, -63.2200],
 		'Distrito 14 - Paurito': [-17.8550, -63.1100],
-		'Distrito 15 - Satelite Norte': [-17.7450, -63.1650]
+		'Distrito 15 - Satélite Norte': [-17.7450, -63.1650]
 	};
 
 	onMount(async () => {
@@ -110,7 +110,7 @@
 
 			await recalculate();
 		} catch {
-			loadError = 'Error al cargar datos. Intenta recargar la pagina.';
+			loadError = 'Error al cargar datos. Intenta recargar la página.';
 		} finally {
 			loading = false;
 		}
@@ -426,24 +426,30 @@
 
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in">
 	<!-- Header -->
-	<div class="flex items-center justify-between mb-8">
-		<div>
-			<h1 class="text-xl font-extrabold text-slate-900 tracking-tight">Panel de Resultados</h1>
-			<p class="text-[13px] text-slate-400 mt-1 font-medium">Conteo rapido — Santa Cruz de la Sierra</p>
+	<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-8">
+		<div class="flex items-center justify-between">
+			<div>
+				<h1 class="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight">Panel de Resultados</h1>
+				<p class="text-[12px] sm:text-[13px] text-slate-400 mt-0.5 font-medium">Conteo rápido — Santa Cruz</p>
+			</div>
+			<div class="sm:hidden flex items-center gap-2 text-[11px] font-semibold text-primary-600 bg-primary-50 border border-primary-100 px-2.5 py-1 rounded-full">
+				<span class="w-1.5 h-1.5 rounded-full bg-primary-500 live-dot"></span>
+				En vivo
+			</div>
 		</div>
 		<div class="flex items-center gap-3">
 			<select
 				bind:value={filtroDistrito}
 				onchange={handleFiltroChange}
 				aria-label="Filtrar por distrito"
-				class="input !w-auto !py-2 !px-3 !text-[13px]"
+				class="input !w-full sm:!w-auto !py-2 !px-3 !text-[13px]"
 			>
 				<option value="">Todos los distritos</option>
 				{#each distritos as d}
 					<option value={d.id}>{d.nombre}</option>
 				{/each}
 			</select>
-			<div class="flex items-center gap-2 text-[12px] font-semibold text-primary-600 bg-primary-50 border border-primary-100 px-3 py-1.5 rounded-full">
+			<div class="hidden sm:flex items-center gap-2 text-[12px] font-semibold text-primary-600 bg-primary-50 border border-primary-100 px-3 py-1.5 rounded-full">
 				<span class="w-2 h-2 rounded-full bg-primary-500 live-dot"></span>
 				En vivo
 			</div>
@@ -484,7 +490,7 @@
 					</div>
 					<p class="text-[12px] font-semibold text-slate-500">Actas Procesadas</p>
 				</div>
-				<p class="text-[28px] font-extrabold text-slate-900 tabular-nums leading-none">{actasProcesadas}</p>
+				<p class="text-[22px] sm:text-[28px] font-extrabold text-slate-900 tabular-nums leading-none">{actasProcesadas}</p>
 				<p class="text-[12px] text-slate-400 mt-2 font-medium">de {totalMesas} mesas</p>
 			</div>
 
@@ -498,7 +504,7 @@
 					</div>
 					<p class="text-[12px] font-semibold text-slate-500">Cobertura</p>
 				</div>
-				<p class="text-[28px] font-extrabold text-primary-600 tabular-nums leading-none">{cobertura()}%</p>
+				<p class="text-[22px] sm:text-[28px] font-extrabold text-primary-600 tabular-nums leading-none">{cobertura()}%</p>
 				<div class="mt-3 h-1.5 bg-slate-100 rounded-full overflow-hidden">
 					<div class="h-full bg-gradient-to-r from-primary-500 to-primary-400 rounded-full transition-all duration-700" style="width: {cobertura()}%"></div>
 				</div>
@@ -513,7 +519,7 @@
 					</div>
 					<p class="text-[12px] font-semibold text-slate-500">Verificadas</p>
 				</div>
-				<p class="text-[28px] font-extrabold text-slate-900 tabular-nums leading-none">{actasVerificadas}</p>
+				<p class="text-[22px] sm:text-[28px] font-extrabold text-slate-900 tabular-nums leading-none">{actasVerificadas}</p>
 				<p class="text-[12px] text-slate-400 mt-2 font-medium">
 					{actasProcesadas > 0 ? ((actasVerificadas / actasProcesadas) * 100).toFixed(0) : 0}% del total
 				</p>
@@ -528,7 +534,7 @@
 					</div>
 					<p class="text-[12px] font-semibold text-slate-500">Total Votos</p>
 				</div>
-				<p class="text-[28px] font-extrabold text-slate-900 tabular-nums leading-none">
+				<p class="text-[22px] sm:text-[28px] font-extrabold text-slate-900 tabular-nums leading-none">
 					{(totalVotosValidos + totalNulos + totalBlancos).toLocaleString('es-BO')}
 				</p>
 				<p class="text-[12px] text-slate-400 mt-2 font-medium">
@@ -577,7 +583,7 @@
 
 			<!-- Donut chart -->
 			<div class="card p-6">
-				<h2 class="section-title mb-5">Distribucion</h2>
+				<h2 class="section-title mb-5">Distribución</h2>
 				<div class="h-64">
 					<canvas id="donutChart"></canvas>
 				</div>
@@ -603,7 +609,7 @@
 
 			<!-- Evolucion temporal -->
 			<div class="card p-6">
-				<h2 class="section-title mb-5">Evolucion del Conteo</h2>
+				<h2 class="section-title mb-5">Evolución del Conteo</h2>
 				<div class="h-72">
 					{#if evolucion.length > 0}
 						<canvas id="lineChart"></canvas>
@@ -615,7 +621,7 @@
 										<path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75z" />
 									</svg>
 								</div>
-								<p class="text-[13px] text-slate-400 font-medium">Se mostrara al procesar actas</p>
+								<p class="text-[13px] text-slate-400 font-medium">Se mostrará al procesar actas</p>
 							</div>
 						</div>
 					{/if}

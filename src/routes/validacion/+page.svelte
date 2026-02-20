@@ -149,20 +149,20 @@
 </script>
 
 <svelte:head>
-	<title>Quantis - Validacion de Actas</title>
+	<title>Quantis - Validación de Actas</title>
 </svelte:head>
 
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in">
-	<div class="flex items-center justify-between mb-8">
+	<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-8">
 		<div>
-			<h1 class="text-xl font-extrabold text-slate-900 tracking-tight">Validacion de Actas</h1>
-			<p class="text-[13px] text-slate-400 mt-1 font-medium">Verifica las actas cargadas por delegados</p>
+			<h1 class="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight">Validación de Actas</h1>
+			<p class="text-[12px] sm:text-[13px] text-slate-400 mt-0.5 font-medium">Verifica las actas cargadas por delegados</p>
 		</div>
 		<select
 			bind:value={filtroDistrito}
 			onchange={() => loadActas()}
 			aria-label="Filtrar por distrito"
-			class="input !w-auto !py-2 !px-3 !text-[13px]"
+			class="input !w-full sm:!w-auto !py-2 !px-3 !text-[13px]"
 		>
 			<option value="">Todos los distritos</option>
 			{#each distritos as d}
@@ -190,7 +190,7 @@
 				class="card-flat p-4 text-left transition-all
 					{active ? 'ring-2 ring-primary-500/30 border-primary-400' : 'hover:border-slate-300'}"
 			>
-				<p class="text-[26px] font-extrabold tabular-nums leading-none
+				<p class="text-[22px] sm:text-[26px] font-extrabold tabular-nums leading-none
 					{estado === 'verificada' ? 'text-success-600' : estado === 'observada' ? 'text-warning-600' : estado === 'rechazada' ? 'text-danger-600' : 'text-slate-900'}">
 					{counts[estado]}
 				</p>
@@ -245,13 +245,13 @@
 						disabled={loading}
 						class="w-full py-3 text-[13px] font-semibold text-primary-600 hover:bg-primary-50 rounded-xl transition-colors disabled:opacity-50"
 					>
-						{loading ? 'Cargando...' : 'Cargar mas actas'}
+						{loading ? 'Cargando...' : 'Cargar más actas'}
 					</button>
 				{/if}
 			{/if}
 		</div>
 
-		<!-- Panel de verificacion -->
+		<!-- Panel de verificación -->
 		{#if selectedActa}
 			<div class="card p-6 sticky top-24">
 				<h3 class="text-[14px] font-bold text-slate-900 mb-5">
@@ -340,7 +340,7 @@
 				</div>
 			</div>
 		{:else}
-			<div class="bg-slate-50/50 border border-dashed border-slate-200 rounded-2xl flex items-center justify-center p-20">
+			<div class="hidden lg:flex bg-slate-50/50 border border-dashed border-slate-200 rounded-2xl items-center justify-center p-20">
 				<div class="text-center">
 					<div class="w-14 h-14 rounded-xl bg-white border border-slate-100 flex items-center justify-center mx-auto mb-4 shadow-sm">
 						<svg class="w-7 h-7 text-slate-300" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor">
