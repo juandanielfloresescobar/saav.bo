@@ -3,7 +3,6 @@
 	import { Chart, registerables } from 'chart.js';
 	import type { Partido, Distrito, ResultadoPartido, EvolucionEntry } from '$lib/types/database';
 
-
 	Chart.register(...registerables);
 
 	let { data } = $props();
@@ -22,6 +21,7 @@
 	let evolucion: { hora: string; actas: number }[] = $state([]);
 	let resultadosPorDistrito: Record<string, Record<string, number>> = $state({});
 	let loading = $state(true);
+	let renderVersion = $state(0); // Incremented to force chart re-renders
 
 	// Chart instances
 	let barChart: Chart | null = null;
@@ -40,24 +40,35 @@
 	// Debounce timer for realtime updates
 	let recalculateTimer: ReturnType<typeof setTimeout> | null = null;
 
-	// District coordinates for Santa Cruz de la Sierra
-	const districtCoords: Record<string, [number, number]> = {
-		'Distrito 1 - Casco Viejo': [-17.7833, -63.1822],
-		'Distrito 2 - Norte': [-17.7650, -63.1820],
-		'Distrito 3 - Estación Argentina': [-17.7920, -63.1680],
-		'Distrito 4 - El Bajío': [-17.8050, -63.1830],
-		'Distrito 5 - Pampa de la Isla': [-17.7780, -63.1530],
-		'Distrito 6 - Villa 1ro de Mayo': [-17.7980, -63.1480],
-		'Distrito 7 - UV Guaracachi': [-17.8150, -63.1600],
-		'Distrito 8 - Plan 3000': [-17.8100, -63.1300],
-		'Distrito 9 - Palmasola': [-17.7600, -63.2100],
-		'Distrito 10 - El Urubo': [-17.7400, -63.2350],
-		'Distrito 11 - Montero Hoyos': [-17.7250, -63.1850],
-		'Distrito 12 - La Guardia': [-17.8500, -63.1900],
-		'Distrito 13 - Nuevo Palmar': [-17.8300, -63.2200],
-		'Distrito 14 - Paurito': [-17.8550, -63.1100],
-		'Distrito 15 - Satélite Norte': [-17.7450, -63.1650]
+	// District coordinates indexed by number for reliable matching
+	const coordsByNumber: Record<number, [number, number]> = {
+		1: [-17.7833, -63.1822],
+		2: [-17.7650, -63.1820],
+		3: [-17.7920, -63.1680],
+		4: [-17.8050, -63.1830],
+		5: [-17.7780, -63.1530],
+		6: [-17.7980, -63.1480],
+		7: [-17.8150, -63.1600],
+		8: [-17.8100, -63.1300],
+		9: [-17.7600, -63.2100],
+		10: [-17.7400, -63.2350],
+		11: [-17.7250, -63.1850],
+		12: [-17.8500, -63.1900],
+		13: [-17.8300, -63.2200],
+		14: [-17.8550, -63.1100],
+		15: [-17.7450, -63.1650]
 	};
+
+	// Lookup coords by matching district name to known distrito objects
+	function getDistrictCoords(distName: string): [number, number] | undefined {
+		// Find distrito by name match
+		const distrito = distritos.find((d) => d.nombre === distName);
+		if (distrito) return coordsByNumber[distrito.numero];
+		// Fallback: try extracting a number from the name
+		const numMatch = distName.match(/(\d+)/);
+		if (numMatch) return coordsByNumber[parseInt(numMatch[1])];
+		return undefined;
+	}
 
 	onMount(async () => {
 		await loadInitialData();
@@ -66,19 +77,18 @@
 
 	// Reactively render charts when data changes and DOM is ready
 	$effect(() => {
-		// Read reactive dependencies to track them
+		// Track reactive dependencies
 		const _loading = loading;
-		const _resultados = resultados;
-		const _evolucion = evolucion;
-		const _rpd = resultadosPorDistrito;
+		const _version = renderVersion;
 
 		if (_loading) return;
 
-		// Wait for DOM to reflect state changes before rendering
-		tick().then(() => {
+		// Use setTimeout to guarantee canvas elements exist in the DOM
+		// tick() alone is unreliable when Svelte conditionally renders {#if}/{:else}
+		setTimeout(() => {
 			renderCharts();
 			renderMap();
-		});
+		}, 50);
 	});
 
 	onDestroy(() => {
@@ -127,6 +137,8 @@
 			await recalculateLegacy();
 		}
 
+		// Bump version to trigger chart re-render via $effect
+		renderVersion++;
 	}
 
 	function applyRpcData(stats: Record<string, any>) {
@@ -145,7 +157,8 @@
 
 		evolucion = (stats.evolucion ?? []).map((e: { hora: string; actas: number }) => ({ hora: e.hora, actas: e.actas }));
 
-		if (!filtroDistrito && stats.por_distrito) {
+		// Always populate per-district data when available
+		if (stats.por_distrito) {
 			const distRes: Record<string, Record<string, number>> = {};
 			for (const pd of stats.por_distrito) {
 				distRes[pd.distrito_nombre] = pd.votos ?? {};
@@ -204,33 +217,34 @@
 		}
 		evolucion = [...evoMap.entries()].map(([hora, actas]) => ({ hora, actas }));
 
-		if (!filtroDistrito) {
-			const distRes: Record<string, Record<string, number>> = {};
-			for (const d of distritos) {
-				distRes[d.nombre] = {};
-				for (const p of partidos) distRes[d.nombre][p.sigla] = 0;
-			}
-			if (actaIds.length > 0) {
-				const { data: votosConActa, error: votosDistError } = await data.supabase
-					.from('votos')
-					.select('partido_id, cantidad, actas!inner(mesas!inner(recintos!inner(distritos!inner(nombre))))')
-					.in('acta_id', actaIds);
-				if (votosDistError) throw new Error('Error al cargar votos por distrito');
+		// Always build per-district data (not just when no filter)
+		const distRes: Record<string, Record<string, number>> = {};
+		for (const d of distritos) {
+			distRes[d.nombre] = {};
+			for (const p of partidos) distRes[d.nombre][p.sigla] = 0;
+		}
+		if (actaIds.length > 0) {
+			const { data: votosConActa, error: votosDistError } = await data.supabase
+				.from('votos')
+				.select('partido_id, cantidad, actas!inner(mesas!inner(recintos!inner(distritos!inner(nombre))))')
+				.in('acta_id', actaIds);
+			if (!votosDistError) {
 				for (const v of votosConActa ?? []) {
 					const distNombre = (v as any).actas?.mesas?.recintos?.distritos?.nombre;
 					const partido = partidos.find((p) => p.id === v.partido_id);
 					if (distNombre && partido && distRes[distNombre]) distRes[distNombre][partido.sigla] += v.cantidad;
 				}
 			}
-			resultadosPorDistrito = distRes;
 		}
+		resultadosPorDistrito = distRes;
 	}
 
 	function renderCharts() {
 		const sortedResults = Object.values(resultados).sort((a, b) => b.votos - a.votos);
+		if (sortedResults.length === 0) return;
 
 		// Bar chart
-		const barCanvas = document.getElementById('barChart') as HTMLCanvasElement;
+		const barCanvas = document.getElementById('barChart') as HTMLCanvasElement | null;
 		if (barCanvas) {
 			barChart?.destroy();
 			barChart = new Chart(barCanvas, {
@@ -252,7 +266,7 @@
 					maintainAspectRatio: false,
 					plugins: { legend: { display: false } },
 					scales: {
-						x: { grid: { color: '#f3f4f6' }, ticks: { font: { size: 11, family: 'Inter' } } },
+						x: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 11, family: 'Inter' } } },
 						y: { grid: { display: false }, ticks: { font: { size: 12, weight: 'bold' as const, family: 'Inter' } } }
 					}
 				}
@@ -260,7 +274,7 @@
 		}
 
 		// Donut chart
-		const donutCanvas = document.getElementById('donutChart') as HTMLCanvasElement;
+		const donutCanvas = document.getElementById('donutChart') as HTMLCanvasElement | null;
 		if (donutCanvas) {
 			donutChart?.destroy();
 			const top5 = sortedResults.slice(0, 5);
@@ -287,7 +301,7 @@
 		}
 
 		// Line chart
-		const lineCanvas = document.getElementById('lineChart') as HTMLCanvasElement;
+		const lineCanvas = document.getElementById('lineChart') as HTMLCanvasElement | null;
 		if (lineCanvas && evolucion.length > 0) {
 			lineChart?.destroy();
 			lineChart = new Chart(lineCanvas, {
@@ -312,7 +326,7 @@
 					plugins: { legend: { display: false } },
 					scales: {
 						x: { grid: { display: false }, ticks: { font: { size: 10, family: 'Inter' }, maxTicksLimit: 8 } },
-						y: { grid: { color: '#f3f4f6' }, beginAtZero: true, ticks: { font: { size: 10, family: 'Inter' } } }
+						y: { grid: { color: '#f1f5f9' }, beginAtZero: true, ticks: { font: { size: 10, family: 'Inter' } } }
 					}
 				}
 			});
@@ -321,7 +335,7 @@
 
 	async function renderMap() {
 		const mapContainer = document.getElementById('mapContainer');
-		if (!mapContainer || Object.keys(resultadosPorDistrito).length === 0) return;
+		if (!mapContainer) return;
 
 		const L = await import('leaflet');
 
@@ -341,9 +355,15 @@
 		// Ensure map tiles render correctly after container is fully laid out
 		setTimeout(() => map?.invalidateSize(), 200);
 
-		// Add district markers
-		for (const [distName, votes] of Object.entries(resultadosPorDistrito)) {
-			const coords = districtCoords[distName];
+		// Add district markers using flexible coord lookup
+		const distData = Object.keys(resultadosPorDistrito).length > 0
+			? resultadosPorDistrito
+			: null;
+
+		if (!distData) return;
+
+		for (const [distName, votes] of Object.entries(distData)) {
+			const coords = getDistrictCoords(distName);
 			if (!coords) continue;
 
 			const totalDistVotes = Object.values(votes).reduce((s, v) => s + v, 0);
@@ -373,7 +393,7 @@
 				fillColor: safeColor,
 				fillOpacity: 0.25,
 				weight: 2
-			}).addTo(map).bindPopup(`
+			}).addTo(map!).bindPopup(`
 				<div style="font-family:Inter,sans-serif;min-width:140px">
 					<div style="font-weight:700;font-size:13px;margin-bottom:4px">${safeDistName}</div>
 					<div style="font-size:12px;color:#6b7280;margin-bottom:6px">${totalDistVotes.toLocaleString('es-BO')} votos</div>
