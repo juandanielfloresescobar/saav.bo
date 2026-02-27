@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { onMount, onDestroy, tick } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { Chart, registerables } from 'chart.js';
-	import type { Partido, Distrito, ResultadoPartido, EvolucionEntry } from '$lib/types/database';
+	import type { Partido, Distrito } from '$lib/types/database';
 
 	Chart.register(...registerables);
 
@@ -21,14 +21,17 @@
 	let evolucion: { hora: string; actas: number }[] = $state([]);
 	let resultadosPorDistrito: Record<string, Record<string, number>> = $state({});
 	let loading = $state(true);
-	let renderVersion = $state(0); // Incremented to force chart re-renders
+	let loadError = $state('');
 
-	// Chart instances
-	let barChart: Chart | null = null;
-	let donutChart: Chart | null = null;
-	let lineChart: Chart | null = null;
+	// DOM references via bind:this (reactive — triggers $effect when element mounts/unmounts)
+	let barCanvas = $state<HTMLCanvasElement | undefined>(undefined);
+	let donutCanvas = $state<HTMLCanvasElement | undefined>(undefined);
+	let lineCanvas = $state<HTMLCanvasElement | undefined>(undefined);
+	let mapEl = $state<HTMLDivElement | undefined>(undefined);
+
+	// Non-reactive refs for cleanup
 	let channel: any = null;
-	let map: import('leaflet').Map | null = null;
+	let recalculateTimer: ReturnType<typeof setTimeout> | null = null;
 
 	// Sanitize text for safe HTML insertion (prevent XSS)
 	function escapeHtml(text: string): string {
@@ -36,9 +39,6 @@
 		div.textContent = text;
 		return div.innerHTML;
 	}
-
-	// Debounce timer for realtime updates
-	let recalculateTimer: ReturnType<typeof setTimeout> | null = null;
 
 	// District coordinates indexed by number for reliable matching
 	const coordsByNumber: Record<number, [number, number]> = {
@@ -59,48 +59,257 @@
 		15: [-17.7450, -63.1650]
 	};
 
-	// Lookup coords by matching district name to known distrito objects
 	function getDistrictCoords(distName: string): [number, number] | undefined {
-		// Find distrito by name match
 		const distrito = distritos.find((d) => d.nombre === distName);
 		if (distrito) return coordsByNumber[distrito.numero];
-		// Fallback: try extracting a number from the name
 		const numMatch = distName.match(/(\d+)/);
 		if (numMatch) return coordsByNumber[parseInt(numMatch[1])];
 		return undefined;
 	}
+
+	// ─── Lifecycle ───
 
 	onMount(async () => {
 		await loadInitialData();
 		setupRealtime();
 	});
 
-	// Reactively render charts when data changes and DOM is ready
-	$effect(() => {
-		// Track reactive dependencies
-		const _loading = loading;
-		const _version = renderVersion;
-
-		if (_loading) return;
-
-		// Use setTimeout to guarantee canvas elements exist in the DOM
-		// tick() alone is unreliable when Svelte conditionally renders {#if}/{:else}
-		setTimeout(() => {
-			renderCharts();
-			renderMap();
-		}, 50);
-	});
-
 	onDestroy(() => {
 		if (recalculateTimer) clearTimeout(recalculateTimer);
 		if (channel) data.supabase.removeChannel(channel);
-		barChart?.destroy();
-		donutChart?.destroy();
-		lineChart?.destroy();
-		if (map) map.remove();
 	});
 
-	let loadError = $state('');
+	// ─── Chart effects (each manages its own lifecycle) ───
+
+	// Bar chart
+	$effect(() => {
+		const canvas = barCanvas;
+		if (!canvas) return;
+
+		const sorted = Object.values(resultados).sort((a, b) => b.votos - a.votos);
+		if (sorted.length === 0) return;
+
+		const chart = new Chart(canvas, {
+			type: 'bar',
+			data: {
+				labels: sorted.map((r) => r.sigla),
+				datasets: [
+					{
+						data: sorted.map((r) => r.votos),
+						backgroundColor: sorted.map((r) => r.color + '20'),
+						borderColor: sorted.map((r) => r.color),
+						borderWidth: 1.5,
+						borderRadius: 6,
+						barThickness: 28
+					}
+				]
+			},
+			options: {
+				indexAxis: 'y',
+				responsive: true,
+				maintainAspectRatio: false,
+				plugins: { legend: { display: false } },
+				scales: {
+					x: {
+						grid: { color: '#f1f5f9' },
+						ticks: { font: { size: 11, family: 'Inter' } }
+					},
+					y: {
+						grid: { display: false },
+						ticks: { font: { size: 12, weight: 'bold' as const, family: 'Inter' } }
+					}
+				}
+			}
+		});
+
+		return () => {
+			chart.destroy();
+		};
+	});
+
+	// Donut chart
+	$effect(() => {
+		const canvas = donutCanvas;
+		if (!canvas) return;
+
+		const sorted = Object.values(resultados).sort((a, b) => b.votos - a.votos);
+		if (sorted.length === 0) return;
+
+		const top5 = sorted.slice(0, 5);
+		const chart = new Chart(canvas, {
+			type: 'doughnut',
+			data: {
+				labels: top5.map((r) => r.sigla),
+				datasets: [
+					{
+						data: top5.map((r) => r.votos),
+						backgroundColor: top5.map((r) => r.color),
+						borderWidth: 3,
+						borderColor: '#fff'
+					}
+				]
+			},
+			options: {
+				responsive: true,
+				maintainAspectRatio: false,
+				cutout: '70%',
+				plugins: {
+					legend: {
+						position: 'bottom',
+						labels: {
+							font: { size: 11, family: 'Inter' },
+							padding: 16,
+							usePointStyle: true,
+							pointStyle: 'circle'
+						}
+					}
+				}
+			}
+		});
+
+		return () => {
+			chart.destroy();
+		};
+	});
+
+	// Line chart
+	$effect(() => {
+		const canvas = lineCanvas;
+		if (!canvas) return;
+
+		const evo = evolucion;
+		if (evo.length === 0) return;
+
+		const chart = new Chart(canvas, {
+			type: 'line',
+			data: {
+				labels: evo.map((e) => e.hora),
+				datasets: [
+					{
+						label: 'Actas procesadas',
+						data: evo.map((e) => e.actas),
+						borderColor: '#2563eb',
+						backgroundColor: 'rgba(37, 99, 235, 0.05)',
+						fill: true,
+						tension: 0.4,
+						pointRadius: 0,
+						pointHoverRadius: 4,
+						borderWidth: 2
+					}
+				]
+			},
+			options: {
+				responsive: true,
+				maintainAspectRatio: false,
+				plugins: { legend: { display: false } },
+				scales: {
+					x: {
+						grid: { display: false },
+						ticks: { font: { size: 10, family: 'Inter' }, maxTicksLimit: 8 }
+					},
+					y: {
+						grid: { color: '#f1f5f9' },
+						beginAtZero: true,
+						ticks: { font: { size: 10, family: 'Inter' } }
+					}
+				}
+			}
+		});
+
+		return () => {
+			chart.destroy();
+		};
+	});
+
+	// Leaflet map
+	$effect(() => {
+		const el = mapEl;
+		if (!el) return;
+
+		// Read reactive deps so this re-runs when district data changes
+		const distData = resultadosPorDistrito;
+		const _partidos = partidos;
+		const _distritos = distritos;
+
+		let mapInstance: import('leaflet').Map | null = null;
+		let active = true;
+
+		import('leaflet').then((L) => {
+			if (!active) return;
+
+			mapInstance = L.map(el, {
+				zoomControl: false,
+				attributionControl: false
+			}).setView([-17.7833, -63.1822], 12);
+
+			L.control.zoom({ position: 'topright' }).addTo(mapInstance);
+
+			L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+				maxZoom: 19
+			}).addTo(mapInstance);
+
+			// Ensure tiles render after container is laid out
+			setTimeout(() => mapInstance?.invalidateSize(), 200);
+
+			// Add district markers
+			if (Object.keys(distData).length === 0) return;
+
+			for (const [distName, votes] of Object.entries(distData)) {
+				const coords = getDistrictCoords(distName);
+				if (!coords) continue;
+
+				const totalDistVotes = Object.values(votes).reduce((s, v) => s + v, 0);
+				if (totalDistVotes === 0) continue;
+
+				let leadParty = '';
+				let leadVotes = 0;
+				for (const [sigla, v] of Object.entries(votes)) {
+					if (v > leadVotes) {
+						leadVotes = v;
+						leadParty = sigla;
+					}
+				}
+
+				const partido = _partidos.find((p) => p.sigla === leadParty);
+				const color = partido?.color ?? '#6b7280';
+				const safeColor = color.replace(/[^#a-fA-F0-9]/g, '');
+				const radius = Math.max(300, Math.min(1200, totalDistVotes / 3));
+				const safeDistName = escapeHtml(distName.replace('Distrito ', 'D'));
+				const safeLeadParty = escapeHtml(leadParty);
+				const pctStr =
+					totalDistVotes > 0 ? ((leadVotes / totalDistVotes) * 100).toFixed(1) : '0';
+
+				L.circle(coords, {
+					radius,
+					color: safeColor,
+					fillColor: safeColor,
+					fillOpacity: 0.25,
+					weight: 2
+				})
+					.addTo(mapInstance!)
+					.bindPopup(
+						`<div style="font-family:Inter,sans-serif;min-width:140px">
+						<div style="font-weight:700;font-size:13px;margin-bottom:4px">${safeDistName}</div>
+						<div style="font-size:12px;color:#6b7280;margin-bottom:6px">${totalDistVotes.toLocaleString('es-BO')} votos</div>
+						<div style="font-size:12px">
+							<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${safeColor};margin-right:4px"></span>
+							<strong>${safeLeadParty}</strong> — ${leadVotes.toLocaleString('es-BO')} (${pctStr}%)
+						</div>
+					</div>`
+					);
+			}
+		});
+
+		return () => {
+			active = false;
+			if (mapInstance) {
+				mapInstance.remove();
+				mapInstance = null;
+			}
+		};
+	});
+
+	// ─── Data loading ───
 
 	async function loadInitialData() {
 		loading = true;
@@ -127,18 +336,15 @@
 	}
 
 	async function recalculate() {
-		// Try optimized RPC first, fall back to legacy queries
-		const { data: rpcData, error: rpcError } = await data.supabase
-			.rpc('get_dashboard_data', { p_distrito_id: filtroDistrito || null });
+		const { data: rpcData, error: rpcError } = await data.supabase.rpc('get_dashboard_data', {
+			p_distrito_id: filtroDistrito || null
+		});
 
 		if (!rpcError && rpcData) {
 			applyRpcData(rpcData);
 		} else {
 			await recalculateLegacy();
 		}
-
-		// Bump version to trigger chart re-render via $effect
-		renderVersion++;
 	}
 
 	function applyRpcData(stats: Record<string, any>) {
@@ -155,9 +361,11 @@
 		resultados = res;
 		totalVotosValidos = Object.values(res).reduce((s, r) => s + r.votos, 0);
 
-		evolucion = (stats.evolucion ?? []).map((e: { hora: string; actas: number }) => ({ hora: e.hora, actas: e.actas }));
+		evolucion = (stats.evolucion ?? []).map((e: { hora: string; actas: number }) => ({
+			hora: e.hora,
+			actas: e.actas
+		}));
 
-		// Always populate per-district data when available
 		if (stats.por_distrito) {
 			const distRes: Record<string, Record<string, number>> = {};
 			for (const pd of stats.por_distrito) {
@@ -168,7 +376,9 @@
 	}
 
 	async function recalculateLegacy() {
-		const mesasCount = await data.supabase.from('mesas').select('*', { count: 'exact', head: true });
+		const mesasCount = await data.supabase
+			.from('mesas')
+			.select('*', { count: 'exact', head: true });
 		if (mesasCount.error) throw new Error('Error al contar mesas');
 		totalMesas = mesasCount.count ?? 0;
 
@@ -196,7 +406,9 @@
 
 		if (actaIds.length > 0) {
 			const { data: votosData, error: votosError } = await data.supabase
-				.from('votos').select('partido_id, cantidad').in('acta_id', actaIds);
+				.from('votos')
+				.select('partido_id, cantidad')
+				.in('acta_id', actaIds);
 			if (votosError) throw new Error('Error al cargar votos');
 			for (const v of votosData ?? []) {
 				if (res[v.partido_id]) res[v.partido_id].votos += v.cantidad;
@@ -212,12 +424,14 @@
 		);
 		for (const acta of sorted) {
 			runningCount++;
-			const hora = new Date(acta.created_at).toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' });
+			const hora = new Date(acta.created_at).toLocaleTimeString('es-BO', {
+				hour: '2-digit',
+				minute: '2-digit'
+			});
 			evoMap.set(hora, runningCount);
 		}
 		evolucion = [...evoMap.entries()].map(([hora, actas]) => ({ hora, actas }));
 
-		// Always build per-district data (not just when no filter)
 		const distRes: Record<string, Record<string, number>> = {};
 		for (const d of distritos) {
 			distRes[d.nombre] = {};
@@ -226,190 +440,32 @@
 		if (actaIds.length > 0) {
 			const { data: votosConActa, error: votosDistError } = await data.supabase
 				.from('votos')
-				.select('partido_id, cantidad, actas!inner(mesas!inner(recintos!inner(distritos!inner(nombre))))')
+				.select(
+					'partido_id, cantidad, actas!inner(mesas!inner(recintos!inner(distritos!inner(nombre))))'
+				)
 				.in('acta_id', actaIds);
 			if (!votosDistError) {
 				for (const v of votosConActa ?? []) {
 					const distNombre = (v as any).actas?.mesas?.recintos?.distritos?.nombre;
 					const partido = partidos.find((p) => p.id === v.partido_id);
-					if (distNombre && partido && distRes[distNombre]) distRes[distNombre][partido.sigla] += v.cantidad;
+					if (distNombre && partido && distRes[distNombre])
+						distRes[distNombre][partido.sigla] += v.cantidad;
 				}
 			}
 		}
 		resultadosPorDistrito = distRes;
 	}
 
-	function renderCharts() {
-		const sortedResults = Object.values(resultados).sort((a, b) => b.votos - a.votos);
-		if (sortedResults.length === 0) return;
-
-		// Bar chart
-		const barCanvas = document.getElementById('barChart') as HTMLCanvasElement | null;
-		if (barCanvas) {
-			barChart?.destroy();
-			barChart = new Chart(barCanvas, {
-				type: 'bar',
-				data: {
-					labels: sortedResults.map((r) => r.sigla),
-					datasets: [{
-						data: sortedResults.map((r) => r.votos),
-						backgroundColor: sortedResults.map((r) => r.color + '20'),
-						borderColor: sortedResults.map((r) => r.color),
-						borderWidth: 1.5,
-						borderRadius: 6,
-						barThickness: 28
-					}]
-				},
-				options: {
-					indexAxis: 'y',
-					responsive: true,
-					maintainAspectRatio: false,
-					plugins: { legend: { display: false } },
-					scales: {
-						x: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 11, family: 'Inter' } } },
-						y: { grid: { display: false }, ticks: { font: { size: 12, weight: 'bold' as const, family: 'Inter' } } }
-					}
-				}
-			});
-		}
-
-		// Donut chart
-		const donutCanvas = document.getElementById('donutChart') as HTMLCanvasElement | null;
-		if (donutCanvas) {
-			donutChart?.destroy();
-			const top5 = sortedResults.slice(0, 5);
-			donutChart = new Chart(donutCanvas, {
-				type: 'doughnut',
-				data: {
-					labels: top5.map((r) => r.sigla),
-					datasets: [{
-						data: top5.map((r) => r.votos),
-						backgroundColor: top5.map((r) => r.color),
-						borderWidth: 3,
-						borderColor: '#fff'
-					}]
-				},
-				options: {
-					responsive: true,
-					maintainAspectRatio: false,
-					cutout: '70%',
-					plugins: {
-						legend: { position: 'bottom', labels: { font: { size: 11, family: 'Inter' }, padding: 16, usePointStyle: true, pointStyle: 'circle' } }
-					}
-				}
-			});
-		}
-
-		// Line chart
-		const lineCanvas = document.getElementById('lineChart') as HTMLCanvasElement | null;
-		if (lineCanvas && evolucion.length > 0) {
-			lineChart?.destroy();
-			lineChart = new Chart(lineCanvas, {
-				type: 'line',
-				data: {
-					labels: evolucion.map((e) => e.hora),
-					datasets: [{
-						label: 'Actas procesadas',
-						data: evolucion.map((e) => e.actas),
-						borderColor: '#2563eb',
-						backgroundColor: 'rgba(37, 99, 235, 0.05)',
-						fill: true,
-						tension: 0.4,
-						pointRadius: 0,
-						pointHoverRadius: 4,
-						borderWidth: 2
-					}]
-				},
-				options: {
-					responsive: true,
-					maintainAspectRatio: false,
-					plugins: { legend: { display: false } },
-					scales: {
-						x: { grid: { display: false }, ticks: { font: { size: 10, family: 'Inter' }, maxTicksLimit: 8 } },
-						y: { grid: { color: '#f1f5f9' }, beginAtZero: true, ticks: { font: { size: 10, family: 'Inter' } } }
-					}
-				}
-			});
-		}
-	}
-
-	async function renderMap() {
-		const mapContainer = document.getElementById('mapContainer');
-		if (!mapContainer) return;
-
-		const L = await import('leaflet');
-
-		if (map) map.remove();
-
-		map = L.map('mapContainer', {
-			zoomControl: false,
-			attributionControl: false
-		}).setView([-17.7833, -63.1822], 12);
-
-		L.control.zoom({ position: 'topright' }).addTo(map);
-
-		L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-			maxZoom: 19
-		}).addTo(map);
-
-		// Ensure map tiles render correctly after container is fully laid out
-		setTimeout(() => map?.invalidateSize(), 200);
-
-		// Add district markers using flexible coord lookup
-		const distData = Object.keys(resultadosPorDistrito).length > 0
-			? resultadosPorDistrito
-			: null;
-
-		if (!distData) return;
-
-		for (const [distName, votes] of Object.entries(distData)) {
-			const coords = getDistrictCoords(distName);
-			if (!coords) continue;
-
-			const totalDistVotes = Object.values(votes).reduce((s, v) => s + v, 0);
-			if (totalDistVotes === 0) continue;
-
-			// Find leading party
-			let leadParty = '';
-			let leadVotes = 0;
-			for (const [sigla, v] of Object.entries(votes)) {
-				if (v > leadVotes) {
-					leadVotes = v;
-					leadParty = sigla;
-				}
-			}
-
-			const partido = partidos.find((p) => p.sigla === leadParty);
-			const color = partido?.color ?? '#6b7280';
-			const safeColor = color.replace(/[^#a-fA-F0-9]/g, '');
-			const radius = Math.max(300, Math.min(1200, totalDistVotes / 3));
-			const safeDistName = escapeHtml(distName.replace('Distrito ', 'D'));
-			const safeLeadParty = escapeHtml(leadParty);
-			const pctStr = totalDistVotes > 0 ? ((leadVotes / totalDistVotes) * 100).toFixed(1) : '0';
-
-			L.circle(coords, {
-				radius,
-				color: safeColor,
-				fillColor: safeColor,
-				fillOpacity: 0.25,
-				weight: 2
-			}).addTo(map!).bindPopup(`
-				<div style="font-family:Inter,sans-serif;min-width:140px">
-					<div style="font-weight:700;font-size:13px;margin-bottom:4px">${safeDistName}</div>
-					<div style="font-size:12px;color:#6b7280;margin-bottom:6px">${totalDistVotes.toLocaleString('es-BO')} votos</div>
-					<div style="font-size:12px">
-						<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${safeColor};margin-right:4px"></span>
-						<strong>${safeLeadParty}</strong> — ${leadVotes.toLocaleString('es-BO')} (${pctStr}%)
-					</div>
-				</div>
-			`);
-		}
-	}
+	// ─── Realtime ───
 
 	function debouncedRecalculate() {
 		if (recalculateTimer) clearTimeout(recalculateTimer);
-		recalculateTimer = setTimeout(() => {
-			recalculate();
+		recalculateTimer = setTimeout(async () => {
+			try {
+				await recalculate();
+			} catch {
+				// Silently ignore realtime refresh errors
+			}
 		}, 500);
 	}
 
@@ -425,6 +481,8 @@
 			.subscribe();
 	}
 
+	// ─── Helpers ───
+
 	function pct(votos: number): string {
 		if (totalVotosValidos === 0) return '0.0';
 		return ((votos / totalVotosValidos) * 100).toFixed(1);
@@ -436,7 +494,11 @@
 	}
 
 	async function handleFiltroChange() {
-		await recalculate();
+		try {
+			await recalculate();
+		} catch {
+			loadError = 'Error al filtrar datos.';
+		}
 	}
 </script>
 
@@ -597,7 +659,7 @@
 			<div class="card p-6">
 				<h2 class="section-title mb-5">Votos por Partido</h2>
 				<div class="h-64">
-					<canvas id="barChart"></canvas>
+					<canvas bind:this={barCanvas}></canvas>
 				</div>
 			</div>
 
@@ -605,7 +667,7 @@
 			<div class="card p-6">
 				<h2 class="section-title mb-5">Distribución</h2>
 				<div class="h-64">
-					<canvas id="donutChart"></canvas>
+					<canvas bind:this={donutCanvas}></canvas>
 				</div>
 			</div>
 		</div>
@@ -624,7 +686,7 @@
 						<span class="text-[12px] font-medium">Santa Cruz</span>
 					</div>
 				</div>
-				<div id="mapContainer" class="h-72 rounded-xl overflow-hidden bg-slate-50 border border-slate-100"></div>
+				<div bind:this={mapEl} class="h-72 rounded-xl overflow-hidden bg-slate-50 border border-slate-100"></div>
 			</div>
 
 			<!-- Evolucion temporal -->
@@ -632,7 +694,7 @@
 				<h2 class="section-title mb-5">Evolución del Conteo</h2>
 				<div class="h-72">
 					{#if evolucion.length > 0}
-						<canvas id="lineChart"></canvas>
+						<canvas bind:this={lineCanvas}></canvas>
 					{:else}
 						<div class="flex items-center justify-center h-full">
 							<div class="text-center">
