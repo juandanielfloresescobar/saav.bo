@@ -1,14 +1,15 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy, tick } from 'svelte';
 	import { Chart, registerables } from 'chart.js';
+	import type { Partido, Distrito, ResultadoPartido, EvolucionEntry } from '$lib/types/database';
 
 	Chart.register(...registerables);
 
 	let { data } = $props();
 
 	// Estado
-	let partidos: any[] = $state([]);
-	let distritos: any[] = $state([]);
+	let partidos: Partido[] = $state([]);
+	let distritos: Distrito[] = $state([]);
 	let filtroDistrito = $state('');
 	let totalMesas = $state(0);
 	let actasProcesadas = $state(0);
@@ -20,39 +21,78 @@
 	let evolucion: { hora: string; actas: number }[] = $state([]);
 	let resultadosPorDistrito: Record<string, Record<string, number>> = $state({});
 	let loading = $state(true);
+	let renderVersion = $state(0); // Incremented to force chart re-renders
 
 	// Chart instances
 	let barChart: Chart | null = null;
 	let donutChart: Chart | null = null;
 	let lineChart: Chart | null = null;
 	let channel: any = null;
-	let map: any = null;
+	let map: import('leaflet').Map | null = null;
 
-	// District coordinates for Santa Cruz de la Sierra
-	const districtCoords: Record<string, [number, number]> = {
-		'Distrito 1 - Casco Viejo': [-17.7833, -63.1822],
-		'Distrito 2 - Norte': [-17.7650, -63.1820],
-		'Distrito 3 - Estacion Argentina': [-17.7920, -63.1680],
-		'Distrito 4 - El Bajio': [-17.8050, -63.1830],
-		'Distrito 5 - Pampa de la Isla': [-17.7780, -63.1530],
-		'Distrito 6 - Villa 1ro de Mayo': [-17.7980, -63.1480],
-		'Distrito 7 - UV Guaracachi': [-17.8150, -63.1600],
-		'Distrito 8 - Plan 3000': [-17.8100, -63.1300],
-		'Distrito 9 - Palmasola': [-17.7600, -63.2100],
-		'Distrito 10 - El Urubo': [-17.7400, -63.2350],
-		'Distrito 11 - Montero Hoyos': [-17.7250, -63.1850],
-		'Distrito 12 - La Guardia': [-17.8500, -63.1900],
-		'Distrito 13 - Nuevo Palmar': [-17.8300, -63.2200],
-		'Distrito 14 - Paurito': [-17.8550, -63.1100],
-		'Distrito 15 - Satelite Norte': [-17.7450, -63.1650]
+	// Sanitize text for safe HTML insertion (prevent XSS)
+	function escapeHtml(text: string): string {
+		const div = document.createElement('div');
+		div.textContent = text;
+		return div.innerHTML;
+	}
+
+	// Debounce timer for realtime updates
+	let recalculateTimer: ReturnType<typeof setTimeout> | null = null;
+
+	// District coordinates indexed by number for reliable matching
+	const coordsByNumber: Record<number, [number, number]> = {
+		1: [-17.7833, -63.1822],
+		2: [-17.7650, -63.1820],
+		3: [-17.7920, -63.1680],
+		4: [-17.8050, -63.1830],
+		5: [-17.7780, -63.1530],
+		6: [-17.7980, -63.1480],
+		7: [-17.8150, -63.1600],
+		8: [-17.8100, -63.1300],
+		9: [-17.7600, -63.2100],
+		10: [-17.7400, -63.2350],
+		11: [-17.7250, -63.1850],
+		12: [-17.8500, -63.1900],
+		13: [-17.8300, -63.2200],
+		14: [-17.8550, -63.1100],
+		15: [-17.7450, -63.1650]
 	};
+
+	// Lookup coords by matching district name to known distrito objects
+	function getDistrictCoords(distName: string): [number, number] | undefined {
+		// Find distrito by name match
+		const distrito = distritos.find((d) => d.nombre === distName);
+		if (distrito) return coordsByNumber[distrito.numero];
+		// Fallback: try extracting a number from the name
+		const numMatch = distName.match(/(\d+)/);
+		if (numMatch) return coordsByNumber[parseInt(numMatch[1])];
+		return undefined;
+	}
 
 	onMount(async () => {
 		await loadInitialData();
 		setupRealtime();
 	});
 
+	// Reactively render charts when data changes and DOM is ready
+	$effect(() => {
+		// Track reactive dependencies
+		const _loading = loading;
+		const _version = renderVersion;
+
+		if (_loading) return;
+
+		// Use setTimeout to guarantee canvas elements exist in the DOM
+		// tick() alone is unreliable when Svelte conditionally renders {#if}/{:else}
+		setTimeout(() => {
+			renderCharts();
+			renderMap();
+		}, 50);
+	});
+
 	onDestroy(() => {
+		if (recalculateTimer) clearTimeout(recalculateTimer);
 		if (channel) data.supabase.removeChannel(channel);
 		barChart?.destroy();
 		donutChart?.destroy();
@@ -60,19 +100,30 @@
 		if (map) map.remove();
 	});
 
+	let loadError = $state('');
+
 	async function loadInitialData() {
 		loading = true;
+		loadError = '';
 
-		const [partidosRes, distritosRes] = await Promise.all([
-			data.supabase.from('partidos').select('*').order('orden'),
-			data.supabase.from('distritos').select('*').order('numero')
-		]);
+		try {
+			const [partidosRes, distritosRes] = await Promise.all([
+				data.supabase.from('partidos').select('*').order('orden'),
+				data.supabase.from('distritos').select('*').order('numero')
+			]);
 
-		partidos = partidosRes.data ?? [];
-		distritos = distritosRes.data ?? [];
+			if (partidosRes.error) throw partidosRes.error;
+			if (distritosRes.error) throw distritosRes.error;
 
-		await recalculate();
-		loading = false;
+			partidos = partidosRes.data ?? [];
+			distritos = distritosRes.data ?? [];
+
+			await recalculate();
+		} catch {
+			loadError = 'Error al cargar datos. Intenta recargar la página.';
+		} finally {
+			loading = false;
+		}
 	}
 
 	async function recalculate() {
@@ -86,11 +137,11 @@
 			await recalculateLegacy();
 		}
 
-		renderCharts();
-		renderMap();
+		// Bump version to trigger chart re-render via $effect
+		renderVersion++;
 	}
 
-	function applyRpcData(stats: any) {
+	function applyRpcData(stats: Record<string, any>) {
 		totalMesas = stats.total_mesas ?? 0;
 		actasProcesadas = stats.actas?.procesadas ?? 0;
 		actasVerificadas = stats.actas?.verificadas ?? 0;
@@ -104,9 +155,10 @@
 		resultados = res;
 		totalVotosValidos = Object.values(res).reduce((s, r) => s + r.votos, 0);
 
-		evolucion = (stats.evolucion ?? []).map((e: any) => ({ hora: e.hora, actas: e.actas }));
+		evolucion = (stats.evolucion ?? []).map((e: { hora: string; actas: number }) => ({ hora: e.hora, actas: e.actas }));
 
-		if (!filtroDistrito && stats.por_distrito) {
+		// Always populate per-district data when available
+		if (stats.por_distrito) {
 			const distRes: Record<string, Record<string, number>> = {};
 			for (const pd of stats.por_distrito) {
 				distRes[pd.distrito_nombre] = pd.votos ?? {};
@@ -117,6 +169,7 @@
 
 	async function recalculateLegacy() {
 		const mesasCount = await data.supabase.from('mesas').select('*', { count: 'exact', head: true });
+		if (mesasCount.error) throw new Error('Error al contar mesas');
 		totalMesas = mesasCount.count ?? 0;
 
 		let actasQuery = data.supabase
@@ -130,19 +183,21 @@
 			actasQuery = actasQuery.eq('mesas.recintos.distrito_id', filtroDistrito);
 		}
 
-		const { data: actasData, count: actasCount } = await actasQuery;
+		const { data: actasData, count: actasCount, error: actasError } = await actasQuery;
+		if (actasError) throw new Error('Error al cargar actas');
 		actasProcesadas = actasCount ?? 0;
-		actasVerificadas = actasData?.filter((a: any) => a.estado === 'verificada').length ?? 0;
-		totalNulos = actasData?.reduce((s: number, a: any) => s + a.votos_nulos, 0) ?? 0;
-		totalBlancos = actasData?.reduce((s: number, a: any) => s + a.votos_blancos, 0) ?? 0;
+		actasVerificadas = actasData?.filter((a) => a.estado === 'verificada').length ?? 0;
+		totalNulos = actasData?.reduce((s: number, a) => s + a.votos_nulos, 0) ?? 0;
+		totalBlancos = actasData?.reduce((s: number, a) => s + a.votos_blancos, 0) ?? 0;
 
-		const actaIds = actasData?.map((a: any) => a.id) ?? [];
+		const actaIds = actasData?.map((a) => a.id) ?? [];
 		const res: Record<string, { sigla: string; color: string; votos: number }> = {};
 		for (const p of partidos) res[p.id] = { sigla: p.sigla, color: p.color, votos: 0 };
 
 		if (actaIds.length > 0) {
-			const { data: votosData } = await data.supabase
+			const { data: votosData, error: votosError } = await data.supabase
 				.from('votos').select('partido_id, cantidad').in('acta_id', actaIds);
+			if (votosError) throw new Error('Error al cargar votos');
 			for (const v of votosData ?? []) {
 				if (res[v.partido_id]) res[v.partido_id].votos += v.cantidad;
 			}
@@ -153,7 +208,7 @@
 		const evoMap = new Map<string, number>();
 		let runningCount = 0;
 		const sorted = [...(actasData ?? [])].sort(
-			(a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+			(a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
 		);
 		for (const acta of sorted) {
 			runningCount++;
@@ -162,32 +217,34 @@
 		}
 		evolucion = [...evoMap.entries()].map(([hora, actas]) => ({ hora, actas }));
 
-		if (!filtroDistrito) {
-			const distRes: Record<string, Record<string, number>> = {};
-			for (const d of distritos) {
-				distRes[d.nombre] = {};
-				for (const p of partidos) distRes[d.nombre][p.sigla] = 0;
-			}
-			if (actaIds.length > 0) {
-				const { data: votosConActa } = await data.supabase
-					.from('votos')
-					.select('partido_id, cantidad, actas!inner(mesas!inner(recintos!inner(distritos!inner(nombre))))')
-					.in('acta_id', actaIds);
+		// Always build per-district data (not just when no filter)
+		const distRes: Record<string, Record<string, number>> = {};
+		for (const d of distritos) {
+			distRes[d.nombre] = {};
+			for (const p of partidos) distRes[d.nombre][p.sigla] = 0;
+		}
+		if (actaIds.length > 0) {
+			const { data: votosConActa, error: votosDistError } = await data.supabase
+				.from('votos')
+				.select('partido_id, cantidad, actas!inner(mesas!inner(recintos!inner(distritos!inner(nombre))))')
+				.in('acta_id', actaIds);
+			if (!votosDistError) {
 				for (const v of votosConActa ?? []) {
 					const distNombre = (v as any).actas?.mesas?.recintos?.distritos?.nombre;
-					const partido = partidos.find((p: any) => p.id === v.partido_id);
+					const partido = partidos.find((p) => p.id === v.partido_id);
 					if (distNombre && partido && distRes[distNombre]) distRes[distNombre][partido.sigla] += v.cantidad;
 				}
 			}
-			resultadosPorDistrito = distRes;
 		}
+		resultadosPorDistrito = distRes;
 	}
 
 	function renderCharts() {
 		const sortedResults = Object.values(resultados).sort((a, b) => b.votos - a.votos);
+		if (sortedResults.length === 0) return;
 
 		// Bar chart
-		const barCanvas = document.getElementById('barChart') as HTMLCanvasElement;
+		const barCanvas = document.getElementById('barChart') as HTMLCanvasElement | null;
 		if (barCanvas) {
 			barChart?.destroy();
 			barChart = new Chart(barCanvas, {
@@ -209,7 +266,7 @@
 					maintainAspectRatio: false,
 					plugins: { legend: { display: false } },
 					scales: {
-						x: { grid: { color: '#f3f4f6' }, ticks: { font: { size: 11, family: 'Inter' } } },
+						x: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 11, family: 'Inter' } } },
 						y: { grid: { display: false }, ticks: { font: { size: 12, weight: 'bold' as const, family: 'Inter' } } }
 					}
 				}
@@ -217,7 +274,7 @@
 		}
 
 		// Donut chart
-		const donutCanvas = document.getElementById('donutChart') as HTMLCanvasElement;
+		const donutCanvas = document.getElementById('donutChart') as HTMLCanvasElement | null;
 		if (donutCanvas) {
 			donutChart?.destroy();
 			const top5 = sortedResults.slice(0, 5);
@@ -244,7 +301,7 @@
 		}
 
 		// Line chart
-		const lineCanvas = document.getElementById('lineChart') as HTMLCanvasElement;
+		const lineCanvas = document.getElementById('lineChart') as HTMLCanvasElement | null;
 		if (lineCanvas && evolucion.length > 0) {
 			lineChart?.destroy();
 			lineChart = new Chart(lineCanvas, {
@@ -269,7 +326,7 @@
 					plugins: { legend: { display: false } },
 					scales: {
 						x: { grid: { display: false }, ticks: { font: { size: 10, family: 'Inter' }, maxTicksLimit: 8 } },
-						y: { grid: { color: '#f3f4f6' }, beginAtZero: true, ticks: { font: { size: 10, family: 'Inter' } } }
+						y: { grid: { color: '#f1f5f9' }, beginAtZero: true, ticks: { font: { size: 10, family: 'Inter' } } }
 					}
 				}
 			});
@@ -278,9 +335,9 @@
 
 	async function renderMap() {
 		const mapContainer = document.getElementById('mapContainer');
-		if (!mapContainer || Object.keys(resultadosPorDistrito).length === 0) return;
+		if (!mapContainer) return;
 
-		const L = (await import('leaflet')).default;
+		const L = await import('leaflet');
 
 		if (map) map.remove();
 
@@ -295,9 +352,18 @@
 			maxZoom: 19
 		}).addTo(map);
 
-		// Add district markers
-		for (const [distName, votes] of Object.entries(resultadosPorDistrito)) {
-			const coords = districtCoords[distName];
+		// Ensure map tiles render correctly after container is fully laid out
+		setTimeout(() => map?.invalidateSize(), 200);
+
+		// Add district markers using flexible coord lookup
+		const distData = Object.keys(resultadosPorDistrito).length > 0
+			? resultadosPorDistrito
+			: null;
+
+		if (!distData) return;
+
+		for (const [distName, votes] of Object.entries(distData)) {
+			const coords = getDistrictCoords(distName);
 			if (!coords) continue;
 
 			const totalDistVotes = Object.values(votes).reduce((s, v) => s + v, 0);
@@ -313,37 +379,48 @@
 				}
 			}
 
-			const partido = partidos.find((p: any) => p.sigla === leadParty);
+			const partido = partidos.find((p) => p.sigla === leadParty);
 			const color = partido?.color ?? '#6b7280';
+			const safeColor = color.replace(/[^#a-fA-F0-9]/g, '');
 			const radius = Math.max(300, Math.min(1200, totalDistVotes / 3));
+			const safeDistName = escapeHtml(distName.replace('Distrito ', 'D'));
+			const safeLeadParty = escapeHtml(leadParty);
+			const pctStr = totalDistVotes > 0 ? ((leadVotes / totalDistVotes) * 100).toFixed(1) : '0';
 
 			L.circle(coords, {
 				radius,
-				color: color,
-				fillColor: color,
+				color: safeColor,
+				fillColor: safeColor,
 				fillOpacity: 0.25,
 				weight: 2
-			}).addTo(map).bindPopup(`
+			}).addTo(map!).bindPopup(`
 				<div style="font-family:Inter,sans-serif;min-width:140px">
-					<div style="font-weight:700;font-size:13px;margin-bottom:4px">${distName.replace('Distrito ', 'D')}</div>
+					<div style="font-weight:700;font-size:13px;margin-bottom:4px">${safeDistName}</div>
 					<div style="font-size:12px;color:#6b7280;margin-bottom:6px">${totalDistVotes.toLocaleString('es-BO')} votos</div>
 					<div style="font-size:12px">
-						<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:4px"></span>
-						<strong>${leadParty}</strong> — ${leadVotes.toLocaleString('es-BO')} (${totalDistVotes > 0 ? ((leadVotes / totalDistVotes) * 100).toFixed(1) : 0}%)
+						<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${safeColor};margin-right:4px"></span>
+						<strong>${safeLeadParty}</strong> — ${leadVotes.toLocaleString('es-BO')} (${pctStr}%)
 					</div>
 				</div>
 			`);
 		}
 	}
 
+	function debouncedRecalculate() {
+		if (recalculateTimer) clearTimeout(recalculateTimer);
+		recalculateTimer = setTimeout(() => {
+			recalculate();
+		}, 500);
+	}
+
 	function setupRealtime() {
 		channel = data.supabase
 			.channel('dashboard-live')
 			.on('postgres_changes', { event: '*', schema: 'public', table: 'actas' }, () => {
-				recalculate();
+				debouncedRecalculate();
 			})
 			.on('postgres_changes', { event: '*', schema: 'public', table: 'votos' }, () => {
-				recalculate();
+				debouncedRecalculate();
 			})
 			.subscribe();
 	}
@@ -367,94 +444,121 @@
 	<title>Quantis - Dashboard Electoral</title>
 </svelte:head>
 
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in">
 	<!-- Header -->
-	<div class="flex items-center justify-between mb-6">
-		<div>
-			<h1 class="text-lg font-bold text-gray-900">Panel de Resultados</h1>
-			<p class="text-xs text-gray-400 mt-0.5">Conteo rapido — Santa Cruz de la Sierra</p>
+	<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-8">
+		<div class="flex items-center justify-between">
+			<div>
+				<h1 class="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight">Panel de Resultados</h1>
+				<p class="text-[12px] sm:text-[13px] text-slate-400 mt-0.5 font-medium">Conteo rápido — Santa Cruz</p>
+			</div>
+			<div class="sm:hidden flex items-center gap-2 text-[11px] font-semibold text-primary-600 bg-primary-50 border border-primary-100 px-2.5 py-1 rounded-full">
+				<span class="w-1.5 h-1.5 rounded-full bg-primary-500 live-dot"></span>
+				En vivo
+			</div>
 		</div>
 		<div class="flex items-center gap-3">
 			<select
 				bind:value={filtroDistrito}
 				onchange={handleFiltroChange}
-				class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
+				aria-label="Filtrar por distrito"
+				class="input !w-full sm:!w-auto !py-2 !px-3 !text-[13px]"
 			>
 				<option value="">Todos los distritos</option>
 				{#each distritos as d}
 					<option value={d.id}>{d.nombre}</option>
 				{/each}
 			</select>
-			<span class="flex items-center gap-1.5 text-xs font-medium text-primary-600 bg-primary-50 px-2.5 py-1.5 rounded-full">
-				<span class="w-1.5 h-1.5 rounded-full bg-primary-500 animate-pulse"></span>
+			<div class="hidden sm:flex items-center gap-2 text-[12px] font-semibold text-primary-600 bg-primary-50 border border-primary-100 px-3 py-1.5 rounded-full">
+				<span class="w-2 h-2 rounded-full bg-primary-500 live-dot"></span>
 				En vivo
-			</span>
+			</div>
 		</div>
 	</div>
 
+	{#if loadError}
+		<div class="flex items-center gap-2.5 bg-danger-50 border border-danger-100 text-danger-600 text-sm rounded-xl px-4 py-3 mb-6">
+			<svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+			</svg>
+			{loadError}
+		</div>
+	{/if}
+
 	{#if loading}
-		<div class="flex items-center justify-center py-20">
-			<div class="flex items-center gap-2 text-gray-400">
+		<div class="flex flex-col items-center justify-center py-24">
+			<div class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-600 to-primary-800 flex items-center justify-center mb-4 shadow-lg shadow-primary-600/20">
+				<span class="text-white font-extrabold text-sm">Q</span>
+			</div>
+			<div class="flex items-center gap-2.5 text-slate-400">
 				<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
 					<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
 					<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
 				</svg>
-				<span class="text-sm">Cargando datos...</span>
+				<span class="text-sm font-medium">Cargando datos...</span>
 			</div>
 		</div>
 	{:else}
 		<!-- KPIs -->
-		<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-			<div class="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
-				<div class="flex items-center gap-2 mb-2">
-					<svg class="w-4 h-4 text-primary-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-					</svg>
-					<p class="text-xs text-gray-400">Actas Procesadas</p>
+		<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+			<div class="card-flat p-5 kpi-card" style="--kpi-color: #3b82f6">
+				<div class="flex items-center gap-2 mb-3">
+					<div class="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center">
+						<svg class="w-4 h-4 text-primary-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+						</svg>
+					</div>
+					<p class="text-[12px] font-semibold text-slate-500">Actas Procesadas</p>
 				</div>
-				<p class="text-2xl font-bold text-gray-900 tabular-nums">{actasProcesadas}</p>
-				<p class="text-xs text-gray-400 mt-1">de {totalMesas} mesas</p>
+				<p class="text-[22px] sm:text-[28px] font-extrabold text-slate-900 tabular-nums leading-none">{actasProcesadas}</p>
+				<p class="text-[12px] text-slate-400 mt-2 font-medium">de {totalMesas} mesas</p>
 			</div>
 
-			<div class="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
-				<div class="flex items-center gap-2 mb-2">
-					<svg class="w-4 h-4 text-primary-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6a7.5 7.5 0 107.5 7.5h-7.5V6z" />
-						<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5H21A7.5 7.5 0 0013.5 3v7.5z" />
-					</svg>
-					<p class="text-xs text-gray-400">Cobertura</p>
+			<div class="card-flat p-5 kpi-card" style="--kpi-color: #2563eb">
+				<div class="flex items-center gap-2 mb-3">
+					<div class="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center">
+						<svg class="w-4 h-4 text-primary-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6a7.5 7.5 0 107.5 7.5h-7.5V6z" />
+							<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5H21A7.5 7.5 0 0013.5 3v7.5z" />
+						</svg>
+					</div>
+					<p class="text-[12px] font-semibold text-slate-500">Cobertura</p>
 				</div>
-				<p class="text-2xl font-bold text-primary-600 tabular-nums">{cobertura()}%</p>
-				<div class="mt-2 h-1 bg-gray-100 rounded-full overflow-hidden">
-					<div class="h-full bg-primary-500 rounded-full transition-all" style="width: {cobertura()}%"></div>
+				<p class="text-[22px] sm:text-[28px] font-extrabold text-primary-600 tabular-nums leading-none">{cobertura()}%</p>
+				<div class="mt-3 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+					<div class="h-full bg-gradient-to-r from-primary-500 to-primary-400 rounded-full transition-all duration-700" style="width: {cobertura()}%"></div>
 				</div>
 			</div>
 
-			<div class="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
-				<div class="flex items-center gap-2 mb-2">
-					<svg class="w-4 h-4 text-primary-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-					</svg>
-					<p class="text-xs text-gray-400">Verificadas</p>
+			<div class="card-flat p-5 kpi-card" style="--kpi-color: #10b981">
+				<div class="flex items-center gap-2 mb-3">
+					<div class="w-8 h-8 rounded-lg bg-success-50 flex items-center justify-center">
+						<svg class="w-4 h-4 text-success-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+						</svg>
+					</div>
+					<p class="text-[12px] font-semibold text-slate-500">Verificadas</p>
 				</div>
-				<p class="text-2xl font-bold text-gray-900 tabular-nums">{actasVerificadas}</p>
-				<p class="text-xs text-gray-400 mt-1">
+				<p class="text-[22px] sm:text-[28px] font-extrabold text-slate-900 tabular-nums leading-none">{actasVerificadas}</p>
+				<p class="text-[12px] text-slate-400 mt-2 font-medium">
 					{actasProcesadas > 0 ? ((actasVerificadas / actasProcesadas) * 100).toFixed(0) : 0}% del total
 				</p>
 			</div>
 
-			<div class="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
-				<div class="flex items-center gap-2 mb-2">
-					<svg class="w-4 h-4 text-primary-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
-					</svg>
-					<p class="text-xs text-gray-400">Total Votos</p>
+			<div class="card-flat p-5 kpi-card" style="--kpi-color: #8b5cf6">
+				<div class="flex items-center gap-2 mb-3">
+					<div class="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center">
+						<svg class="w-4 h-4 text-violet-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+						</svg>
+					</div>
+					<p class="text-[12px] font-semibold text-slate-500">Total Votos</p>
 				</div>
-				<p class="text-2xl font-bold text-gray-900 tabular-nums">
+				<p class="text-[22px] sm:text-[28px] font-extrabold text-slate-900 tabular-nums leading-none">
 					{(totalVotosValidos + totalNulos + totalBlancos).toLocaleString('es-BO')}
 				</p>
-				<p class="text-xs text-gray-400 mt-1">
-					{totalNulos.toLocaleString('es-BO')} nulos · {totalBlancos.toLocaleString('es-BO')} blancos
+				<p class="text-[12px] text-slate-400 mt-2 font-medium">
+					{totalNulos.toLocaleString('es-BO')} nulos &middot; {totalBlancos.toLocaleString('es-BO')} blancos
 				</p>
 			</div>
 		</div>
@@ -462,25 +566,25 @@
 		<!-- Charts Row -->
 		<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
 			<!-- Resultados tabla -->
-			<div class="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
-				<h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Resultados por Partido</h2>
-				<div class="space-y-3">
+			<div class="card p-6">
+				<h2 class="section-title mb-5">Resultados por Partido</h2>
+				<div class="space-y-3.5">
 					{#each Object.values(resultados).sort((a, b) => b.votos - a.votos) as res, i}
 						<div>
-							<div class="flex items-center justify-between mb-1">
-								<div class="flex items-center gap-2">
-									<span class="text-xs font-bold text-gray-300 w-4">{i + 1}</span>
-									<span class="w-2.5 h-2.5 rounded-full" style="background-color: {res.color}"></span>
-									<span class="text-sm font-medium text-gray-900">{res.sigla}</span>
+							<div class="flex items-center justify-between mb-1.5">
+								<div class="flex items-center gap-2.5">
+									<span class="text-[11px] font-bold text-slate-300 w-4 tabular-nums">{i + 1}</span>
+									<span class="w-3 h-3 rounded-full shadow-sm" style="background-color: {res.color}"></span>
+									<span class="text-[13px] font-semibold text-slate-800">{res.sigla}</span>
 								</div>
-								<div class="text-right">
-									<span class="text-sm font-bold text-gray-900 tabular-nums">{pct(res.votos)}%</span>
-									<span class="text-xs text-gray-400 ml-1 tabular-nums">({res.votos.toLocaleString('es-BO')})</span>
+								<div class="text-right flex items-baseline gap-1.5">
+									<span class="text-[14px] font-extrabold text-slate-900 tabular-nums">{pct(res.votos)}%</span>
+									<span class="text-[11px] text-slate-400 tabular-nums font-medium">({res.votos.toLocaleString('es-BO')})</span>
 								</div>
 							</div>
-							<div class="h-1.5 bg-gray-50 rounded-full overflow-hidden ml-6">
+							<div class="h-2 bg-slate-50 rounded-full overflow-hidden ml-[26px]">
 								<div
-									class="h-full rounded-full transition-all duration-500"
+									class="h-full rounded-full transition-all duration-700 ease-out"
 									style="width: {pct(res.votos)}%; background-color: {res.color}"
 								></div>
 							</div>
@@ -490,16 +594,16 @@
 			</div>
 
 			<!-- Bar chart -->
-			<div class="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
-				<h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Votos por Partido</h2>
+			<div class="card p-6">
+				<h2 class="section-title mb-5">Votos por Partido</h2>
 				<div class="h-64">
 					<canvas id="barChart"></canvas>
 				</div>
 			</div>
 
 			<!-- Donut chart -->
-			<div class="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
-				<h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Distribucion</h2>
+			<div class="card p-6">
+				<h2 class="section-title mb-5">Distribución</h2>
 				<div class="h-64">
 					<canvas id="donutChart"></canvas>
 				</div>
@@ -509,33 +613,35 @@
 		<!-- Map + Evolution Row -->
 		<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
 			<!-- Mapa -->
-			<div class="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
-				<div class="flex items-center justify-between mb-4">
-					<h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Mapa Electoral</h2>
-					<div class="flex items-center gap-1">
+			<div class="card p-6">
+				<div class="flex items-center justify-between mb-5">
+					<h2 class="section-title">Mapa Electoral</h2>
+					<div class="flex items-center gap-1.5 text-slate-400">
 						<svg class="w-3.5 h-3.5 text-primary-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
 							<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
 						</svg>
-						<span class="text-xs text-gray-400">Santa Cruz</span>
+						<span class="text-[12px] font-medium">Santa Cruz</span>
 					</div>
 				</div>
-				<div id="mapContainer" class="h-72 rounded-lg overflow-hidden bg-gray-50"></div>
+				<div id="mapContainer" class="h-72 rounded-xl overflow-hidden bg-slate-50 border border-slate-100"></div>
 			</div>
 
 			<!-- Evolucion temporal -->
-			<div class="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
-				<h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Evolucion del Conteo</h2>
+			<div class="card p-6">
+				<h2 class="section-title mb-5">Evolución del Conteo</h2>
 				<div class="h-72">
 					{#if evolucion.length > 0}
 						<canvas id="lineChart"></canvas>
 					{:else}
 						<div class="flex items-center justify-center h-full">
 							<div class="text-center">
-								<svg class="w-8 h-8 text-gray-200 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor">
-									<path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75z" />
-								</svg>
-								<p class="text-xs text-gray-400">Se mostrara al procesar actas</p>
+								<div class="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center mx-auto mb-3">
+									<svg class="w-6 h-6 text-slate-300" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75z" />
+									</svg>
+								</div>
+								<p class="text-[13px] text-slate-400 font-medium">Se mostrará al procesar actas</p>
 							</div>
 						</div>
 					{/if}
@@ -545,34 +651,34 @@
 
 		<!-- Tabla por distrito -->
 		{#if !filtroDistrito && Object.keys(resultadosPorDistrito).length > 0}
-			<div class="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
-				<h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Resultados por Distrito</h2>
-				<div class="overflow-x-auto">
+			<div class="card p-6">
+				<h2 class="section-title mb-5">Resultados por Distrito</h2>
+				<div class="overflow-x-auto -mx-2">
 					<table class="w-full text-sm">
 						<thead>
-							<tr class="border-b border-gray-100">
-								<th class="text-left py-2.5 pr-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Distrito</th>
+							<tr class="border-b border-slate-100">
+								<th class="text-left py-3 pr-4 pl-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Distrito</th>
 								{#each partidos as p}
-									<th class="text-right py-2.5 px-2 text-xs font-semibold" style="color: {p.color}">
+									<th class="text-right py-3 px-2 text-[11px] font-bold uppercase tracking-wider" style="color: {p.color}">
 										{p.sigla}
 									</th>
 								{/each}
-								<th class="text-right py-2.5 pl-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Total</th>
+								<th class="text-right py-3 pl-3 pr-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total</th>
 							</tr>
 						</thead>
 						<tbody>
 							{#each Object.entries(resultadosPorDistrito) as [distrito, votos]}
 								{@const total = Object.values(votos).reduce((s, v) => s + v, 0)}
 								{@const maxVotos = Math.max(...Object.values(votos))}
-								<tr class="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
-									<td class="py-2.5 pr-4 text-xs text-gray-700 whitespace-nowrap font-medium">{distrito.replace('Distrito ', 'D')}</td>
+								<tr class="border-b border-slate-50 hover:bg-slate-50/80 transition-colors">
+									<td class="py-3 pr-4 pl-2 text-[12px] text-slate-700 whitespace-nowrap font-semibold">{distrito.replace('Distrito ', 'D')}</td>
 									{#each partidos as p}
 										{@const v = votos[p.sigla] ?? 0}
-										<td class="py-2.5 px-2 text-right text-xs tabular-nums {v === maxVotos && v > 0 ? 'font-bold text-gray-900' : 'text-gray-500'}">
+										<td class="py-3 px-2 text-right text-[12px] tabular-nums {v === maxVotos && v > 0 ? 'font-bold text-slate-900' : 'text-slate-400'}">
 											{v > 0 ? v.toLocaleString('es-BO') : '-'}
 										</td>
 									{/each}
-									<td class="py-2.5 pl-3 text-right text-xs font-semibold text-gray-900 tabular-nums">
+									<td class="py-3 pl-3 pr-2 text-right text-[12px] font-bold text-slate-900 tabular-nums">
 										{total > 0 ? total.toLocaleString('es-BO') : '-'}
 									</td>
 								</tr>
