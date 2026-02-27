@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
+	import { invalidateAll, goto } from '$app/navigation';
 
 	let { data } = $props();
 
@@ -24,8 +24,12 @@
 			return;
 		}
 
-		// Full reload ensures server-side cookies are set before layout.server.ts runs
-		window.location.href = '/';
+		// invalidateAll forces ALL load functions (including server loads) to re-run.
+		// SvelteKit re-fetches server data via internal fetch which includes the
+		// auth cookies that @supabase/ssr just set after signInWithPassword().
+		// This ensures session + perfil are available before navigation.
+		await invalidateAll();
+		goto('/');
 	}
 </script>
 
