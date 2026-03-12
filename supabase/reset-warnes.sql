@@ -272,14 +272,4 @@ BEGIN
   RAISE NOTICE 'Seed completado: % actas creadas con votos', v_mesa_count;
 END $$;
 
--- ============================================
--- LISTO! Credenciales de prueba:
--- ============================================
--- Admin:       admin@quantis.bo       / Quantis2026!
--- Delegado 1:  delegado1@quantis.bo   / Delegado2026!
--- Delegado 2:  delegado2@quantis.bo   / Delegado2026!
--- Delegado 3:  delegado3@quantis.bo   / Delegado2026!
--- Delegado 4:  delegado4@quantis.bo   / Delegado2026!
--- Delegado 5:  delegado5@quantis.bo   / Delegado2026!
--- Verificador: verificador@quantis.bo / Verificador2026!
--- Candidato:   candidato@quantis.bo   / Candidato2026!
+-- Seed completado. Ver credenciales en seed-demo.sql
