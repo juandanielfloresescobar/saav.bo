@@ -128,3 +128,6 @@ AS $$
 $$;
 
 GRANT EXECUTE ON FUNCTION get_acta_counts_by_estado() TO authenticated;
+
+-- Forzar recarga del schema en PostgREST
+NOTIFY pgrst, 'reload schema';
