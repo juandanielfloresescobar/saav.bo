@@ -441,4 +441,11 @@ BEGIN
   RAISE NOTICE 'Santa Cruz: % actas creadas', v_mesa_count;
 END $$;
 
+-- ============================================
+-- PASO 10: Forzar recarga del schema en PostgREST
+-- ============================================
+-- Esto es necesario para que la API REST reconozca
+-- la nueva tabla municipios y la columna municipio_id
+NOTIFY pgrst, 'reload schema';
+
 -- Seed completado. Ver credenciales en seed-demo.sql

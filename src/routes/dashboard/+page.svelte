@@ -346,10 +346,9 @@
 		loadError = '';
 
 		try {
-			const [partidosRes, distritosRes, municipiosRes] = await Promise.all([
+			const [partidosRes, distritosRes] = await Promise.all([
 				data.supabase.from('partidos').select('*').order('orden'),
-				data.supabase.from('distritos').select('*').order('numero'),
-				data.supabase.from('municipios').select('*').order('nombre')
+				data.supabase.from('distritos').select('*').order('numero')
 			]);
 
 			if (partidosRes.error) throw partidosRes.error;
@@ -357,7 +356,14 @@
 
 			partidos = partidosRes.data ?? [];
 			distritos = distritosRes.data ?? [];
-			municipios = municipiosRes.data ?? [];
+
+			// Municipios table might not exist yet — query separately and handle gracefully
+			try {
+				const municipiosRes = await data.supabase.from('municipios').select('*').order('nombre');
+				municipios = municipiosRes.data ?? [];
+			} catch {
+				municipios = [];
+			}
 
 			// Default to first municipality
 			if (municipios.length > 0) {
@@ -422,12 +428,41 @@
 			? [filtroDistrito]
 			: municipioDistritos.map(d => d.id);
 
-		const mesasCount = await data.supabase
-			.from('mesas')
-			.select('*, recintos!inner(distrito_id)', { count: 'exact', head: true })
-			.in('recintos.distrito_id', distritoIds);
-		totalMesas = mesasCount.count ?? 0;
+		// Get recinto IDs that belong to the selected districts
+		let recintoIds: string[] = [];
+		if (distritoIds.length > 0) {
+			const { data: recintosData } = await data.supabase
+				.from('recintos')
+				.select('id')
+				.in('distrito_id', distritoIds);
+			recintoIds = (recintosData ?? []).map(r => r.id);
+		}
 
+		// Count mesas in those recintos
+		if (recintoIds.length > 0) {
+			const mesasCount = await data.supabase
+				.from('mesas')
+				.select('*', { count: 'exact', head: true })
+				.in('recinto_id', recintoIds);
+			totalMesas = mesasCount.count ?? 0;
+		} else {
+			const mesasCount = await data.supabase
+				.from('mesas')
+				.select('*', { count: 'exact', head: true });
+			totalMesas = mesasCount.count ?? 0;
+		}
+
+		// Get mesa IDs for those recintos
+		let mesaIds: string[] = [];
+		if (recintoIds.length > 0) {
+			const { data: mesasData } = await data.supabase
+				.from('mesas')
+				.select('id')
+				.in('recinto_id', recintoIds);
+			mesaIds = (mesasData ?? []).map(m => m.id);
+		}
+
+		// Get actas for those mesas
 		let actasQuery = data.supabase
 			.from('actas')
 			.select(
@@ -435,10 +470,10 @@
 				 mesas!inner(recinto_id, recintos!inner(distrito_id))`,
 				{ count: 'exact' }
 			);
-		if (filtroDistrito) {
+		if (mesaIds.length > 0) {
+			actasQuery = actasQuery.in('mesa_id', mesaIds);
+		} else if (filtroDistrito) {
 			actasQuery = actasQuery.eq('mesas.recintos.distrito_id', filtroDistrito);
-		} else if (distritoIds.length > 0) {
-			actasQuery = actasQuery.in('mesas.recintos.distrito_id', distritoIds);
 		}
 
 		const { data: actasData, count: actasCount, error: actasError } = await actasQuery;
