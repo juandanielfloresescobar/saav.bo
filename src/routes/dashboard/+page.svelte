@@ -40,23 +40,14 @@
 		return div.innerHTML;
 	}
 
-	// District coordinates indexed by number for reliable matching
+	// District coordinates indexed by number — Warnes municipality
 	const coordsByNumber: Record<number, [number, number]> = {
-		1: [-17.7833, -63.1822],
-		2: [-17.7650, -63.1820],
-		3: [-17.7920, -63.1680],
-		4: [-17.8050, -63.1830],
-		5: [-17.7780, -63.1530],
-		6: [-17.7980, -63.1480],
-		7: [-17.8150, -63.1600],
-		8: [-17.8100, -63.1300],
-		9: [-17.7600, -63.2100],
-		10: [-17.7400, -63.2350],
-		11: [-17.7250, -63.1850],
-		12: [-17.8500, -63.1900],
-		13: [-17.8300, -63.2200],
-		14: [-17.8550, -63.1100],
-		15: [-17.7450, -63.1650]
+		1: [-17.5103, -63.1647], // Central - Warnes centro
+		2: [-17.4850, -63.1700], // Norte - Juan Latino
+		3: [-17.5380, -63.1580], // Sur - Los Chacos
+		4: [-17.5150, -63.1350], // Este - Asusaquí
+		5: [-17.5050, -63.1950], // Oeste - Clara Chuchío
+		6: [-17.5250, -63.1450]  // Industrial - Parque Industrial
 	};
 
 	function getDistrictCoords(distName: string): [number, number] | undefined {
@@ -240,7 +231,7 @@
 			mapInstance = L.map(el, {
 				zoomControl: false,
 				attributionControl: false
-			}).setView([-17.7833, -63.1822], 12);
+			}).setView([-17.5103, -63.1647], 13);
 
 			L.control.zoom({ position: 'topright' }).addTo(mapInstance);
 
@@ -512,7 +503,7 @@
 		<div class="flex items-center justify-between">
 			<div>
 				<h1 class="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight">Panel de Resultados</h1>
-				<p class="text-[12px] sm:text-[13px] text-slate-400 mt-0.5 font-medium">Conteo rápido — Santa Cruz</p>
+				<p class="text-[12px] sm:text-[13px] text-slate-400 mt-0.5 font-medium">Conteo rápido — Warnes</p>
 			</div>
 			<div class="sm:hidden flex items-center gap-2 text-[11px] font-semibold text-primary-600 bg-primary-50 border border-primary-100 px-2.5 py-1 rounded-full">
 				<span class="w-1.5 h-1.5 rounded-full bg-primary-500 live-dot"></span>
@@ -683,7 +674,7 @@
 							<path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
 							<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
 						</svg>
-						<span class="text-[12px] font-medium">Santa Cruz</span>
+						<span class="text-[12px] font-medium">Warnes</span>
 					</div>
 				</div>
 				<div bind:this={mapEl} class="h-72 rounded-xl overflow-hidden bg-slate-50 border border-slate-100"></div>

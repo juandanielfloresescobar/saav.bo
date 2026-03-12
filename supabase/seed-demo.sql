@@ -58,21 +58,21 @@ ON CONFLICT DO NOTHING;
 -- ============================================
 
 INSERT INTO usuarios (auth_user_id, nombre, telefono, rol, recinto_id) VALUES
-  ('aaaa0001-0001-0001-0001-000000000001', 'Juan Daniel Flores', '+591 70000001', 'admin', NULL),
-  ('aaaa0001-0001-0001-0001-000000000002', 'Carlos Mendez Rojas', '+591 70000002', 'delegado', (SELECT id FROM recintos WHERE codigo = 'R001')),
-  ('aaaa0001-0001-0001-0001-000000000003', 'Maria Elena Gutierrez', '+591 70000003', 'delegado', (SELECT id FROM recintos WHERE codigo = 'R003')),
-  ('aaaa0001-0001-0001-0001-000000000004', 'Roberto Suarez Paz', '+591 70000004', 'delegado', (SELECT id FROM recintos WHERE codigo = 'R007')),
-  ('aaaa0001-0001-0001-0001-000000000005', 'Ana Patricia Velasco', '+591 70000005', 'delegado', (SELECT id FROM recintos WHERE codigo = 'R010')),
-  ('aaaa0001-0001-0001-0001-000000000006', 'Fernando Costas Lima', '+591 70000006', 'delegado', (SELECT id FROM recintos WHERE codigo = 'R015')),
-  ('aaaa0001-0001-0001-0001-000000000007', 'Lucia Roca Terrazas', '+591 70000007', 'verificador', NULL),
-  ('aaaa0001-0001-0001-0001-000000000008', 'Miguel Angel Torrez', '+591 70000008', 'candidato', NULL)
+  ('aaaa0001-0001-0001-0001-000000000001', 'Ricardo Montaño Peña', '+591 70100001', 'admin', NULL),
+  ('aaaa0001-0001-0001-0001-000000000002', 'Carmen Rojas Suárez', '+591 70100002', 'delegado', (SELECT id FROM recintos WHERE codigo = 'R001')),
+  ('aaaa0001-0001-0001-0001-000000000003', 'José Luis Mamani Quispe', '+591 70100003', 'delegado', (SELECT id FROM recintos WHERE codigo = 'R004')),
+  ('aaaa0001-0001-0001-0001-000000000004', 'Paola Chávez Gutiérrez', '+591 70100004', 'delegado', (SELECT id FROM recintos WHERE codigo = 'R007')),
+  ('aaaa0001-0001-0001-0001-000000000005', 'Marco Antonio Soliz', '+591 70100005', 'delegado', (SELECT id FROM recintos WHERE codigo = 'R009')),
+  ('aaaa0001-0001-0001-0001-000000000006', 'Silvia Condori Vargas', '+591 70100006', 'delegado', (SELECT id FROM recintos WHERE codigo = 'R013')),
+  ('aaaa0001-0001-0001-0001-000000000007', 'Edgar Fernández Roca', '+591 70100007', 'verificador', NULL),
+  ('aaaa0001-0001-0001-0001-000000000008', 'Daniela Torrez Sandóval', '+591 70100008', 'candidato', NULL)
 ON CONFLICT (auth_user_id) DO NOTHING;
 
 -- ============================================
 -- 3. Generar actas y votos ficticios
 -- ============================================
--- Genera ~45 actas (de 63 mesas totales) con datos realistas
--- UCS lidera (~32%), C-A segundo (~26%), MAS tercero (~16%)
+-- Genera ~55 actas (de 80 mesas totales) con datos realistas
+-- MAS lidera (~25%), Creemos segundo (~20%), SPT tercero (~18%)
 
 DO $$
 DECLARE
@@ -107,14 +107,14 @@ BEGIN
   v_base_time := date_trunc('day', now()) + interval '8 hours';
 
   -- Pesos de distribucion por partido (orden = 1..8)
-  -- UCS=32%, C-A=26%, MAS=16%, SPT=9%, DEM=7%, SOL=5%, FPV=3%, MTS=2%
-  v_pesos := ARRAY[0.32, 0.26, 0.16, 0.09, 0.07, 0.05, 0.03, 0.02];
+  -- MAS=25%, CREEMOS=20%, SPT=18%, UCS=12%, ADN=10%, MTS=7%, NGP=5%, PDC=3%
+  v_pesos := ARRAY[0.25, 0.20, 0.18, 0.12, 0.10, 0.07, 0.05, 0.03];
 
   FOR v_mesa IN
     SELECT m.id, m.numero, m.total_habilitados, m.recinto_id
     FROM mesas m
     ORDER BY random()
-    LIMIT 45
+    LIMIT 55
   LOOP
     v_mesa_count := v_mesa_count + 1;
 

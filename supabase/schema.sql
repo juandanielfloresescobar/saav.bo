@@ -211,49 +211,35 @@ ALTER PUBLICATION supabase_realtime ADD TABLE actas;
 ALTER PUBLICATION supabase_realtime ADD TABLE votos;
 
 -- ============================================
--- SEED DATA: Santa Cruz de la Sierra (demo)
+-- SEED DATA: Municipio de Warnes (demo)
 -- ============================================
 
--- 15 Distritos Municipales
+-- 6 Distritos Municipales de Warnes
 INSERT INTO distritos (numero, nombre) VALUES
-  (1, 'Distrito 1 - Casco Viejo'),
-  (2, 'Distrito 2 - Norte'),
-  (3, 'Distrito 3 - Estación Argentina'),
-  (4, 'Distrito 4 - El Bajío'),
-  (5, 'Distrito 5 - Pampa de la Isla'),
-  (6, 'Distrito 6 - Villa 1ro de Mayo'),
-  (7, 'Distrito 7 - UV Guaracachi'),
-  (8, 'Distrito 8 - Plan 3000'),
-  (9, 'Distrito 9 - Palmasola'),
-  (10, 'Distrito 10 - El Urubó'),
-  (11, 'Distrito 11 - Montero Hoyos'),
-  (12, 'Distrito 12 - La Guardia'),
-  (13, 'Distrito 13 - Nuevo Palmar'),
-  (14, 'Distrito 14 - Paurito'),
-  (15, 'Distrito 15 - Satélite Norte');
+  (1, 'Distrito 1 - Central (Warnes)'),
+  (2, 'Distrito 2 - Norte (Juan Latino)'),
+  (3, 'Distrito 3 - Sur (Los Chacos)'),
+  (4, 'Distrito 4 - Este (Asusaquí)'),
+  (5, 'Distrito 5 - Oeste (Clara Chuchío)'),
+  (6, 'Distrito 6 - Industrial (Parque Industrial)');
 
--- Recintos de ejemplo (20 recintos en distintos distritos)
+-- 15 Recintos electorales de Warnes (~80 mesas totales)
 INSERT INTO recintos (nombre, codigo, direccion, distrito_id, total_mesas) VALUES
-  ('Unidad Educativa Germán Busch', 'R001', 'Av. Busch esq. 2do Anillo', (SELECT id FROM distritos WHERE numero = 1), 5),
-  ('Colegio Nacional Florida', 'R002', 'C/ Florida y Av. Irala', (SELECT id FROM distritos WHERE numero = 1), 4),
-  ('Unidad Educativa Guapay', 'R003', 'Av. Santos Dumont 3er Anillo', (SELECT id FROM distritos WHERE numero = 2), 3),
-  ('Colegio Don Bosco', 'R004', 'C/ Ingavi esq. Quijarro', (SELECT id FROM distritos WHERE numero = 2), 4),
-  ('Unidad Educativa Estación Argentina', 'R005', 'Av. Argentina y 3er Anillo', (SELECT id FROM distritos WHERE numero = 3), 3),
-  ('Colegio Fe y Alegría', 'R006', 'C/ El Fuerte, B/ El Bajío', (SELECT id FROM distritos WHERE numero = 4), 3),
-  ('Unidad Educativa Pampa de la Isla', 'R007', 'Av. Virgen de Cotoca', (SELECT id FROM distritos WHERE numero = 5), 4),
-  ('Colegio Villa 1ro de Mayo', 'R008', 'B/ Villa 1ro de Mayo', (SELECT id FROM distritos WHERE numero = 6), 3),
-  ('Unidad Educativa Guaracachi', 'R009', 'UV Guaracachi', (SELECT id FROM distritos WHERE numero = 7), 3),
-  ('Colegio Plan 3000', 'R010', 'Av. Principal Plan 3000', (SELECT id FROM distritos WHERE numero = 8), 5),
-  ('Unidad Educativa 24 de Septiembre', 'R011', 'B/ 24 de Septiembre, Plan 3000', (SELECT id FROM distritos WHERE numero = 8), 4),
-  ('Colegio Palmasola', 'R012', 'Zona Palmasola', (SELECT id FROM distritos WHERE numero = 9), 2),
-  ('Unidad Educativa El Urubó', 'R013', 'Zona El Urubó', (SELECT id FROM distritos WHERE numero = 10), 2),
-  ('Colegio Montero Hoyos', 'R014', 'Comunidad Montero Hoyos', (SELECT id FROM distritos WHERE numero = 11), 2),
-  ('Unidad Educativa La Guardia', 'R015', 'Av. Principal La Guardia', (SELECT id FROM distritos WHERE numero = 12), 3),
-  ('Colegio Nuevo Palmar', 'R016', 'Comunidad Nuevo Palmar', (SELECT id FROM distritos WHERE numero = 13), 2),
-  ('Unidad Educativa Paurito', 'R017', 'Comunidad Paurito', (SELECT id FROM distritos WHERE numero = 14), 2),
-  ('Colegio Satélite Norte', 'R018', 'B/ Satélite Norte', (SELECT id FROM distritos WHERE numero = 15), 3),
-  ('Unidad Educativa Hamacas', 'R019', 'B/ Hamacas, 4to Anillo', (SELECT id FROM distritos WHERE numero = 3), 3),
-  ('Colegio Libertad', 'R020', 'UV 120, B/ Libertad', (SELECT id FROM distritos WHERE numero = 5), 3);
+  ('Unidad Educativa Mariscal Sucre', 'R001', 'Av. Principal esq. C/ Bolívar, Warnes Centro', (SELECT id FROM distritos WHERE numero = 1), 6),
+  ('Colegio Nacional Warnes', 'R002', 'C/ Sucre y C/ Comercio, Warnes Centro', (SELECT id FROM distritos WHERE numero = 1), 5),
+  ('Unidad Educativa Ignacio Warnes', 'R003', 'Av. Cívica, B/ Central', (SELECT id FROM distritos WHERE numero = 1), 5),
+  ('Colegio Juan Latino', 'R004', 'Comunidad Juan Latino, Zona Norte', (SELECT id FROM distritos WHERE numero = 2), 6),
+  ('Unidad Educativa 24 de Septiembre', 'R005', 'Camino Juan Latino km 3', (SELECT id FROM distritos WHERE numero = 2), 5),
+  ('Colegio República de Venezuela', 'R006', 'Zona Norte, B/ Nuevo Amanecer', (SELECT id FROM distritos WHERE numero = 2), 5),
+  ('Unidad Educativa Los Chacos', 'R007', 'Comunidad Los Chacos, Zona Sur', (SELECT id FROM distritos WHERE numero = 3), 6),
+  ('Colegio San Martín de Porres', 'R008', 'Camino Los Chacos km 5', (SELECT id FROM distritos WHERE numero = 3), 5),
+  ('Unidad Educativa Asusaquí', 'R009', 'Comunidad Asusaquí, Zona Este', (SELECT id FROM distritos WHERE numero = 4), 6),
+  ('Colegio Franz Tamayo', 'R010', 'Camino a Asusaquí km 4', (SELECT id FROM distritos WHERE numero = 4), 5),
+  ('Unidad Educativa Clara Chuchío', 'R011', 'Comunidad Clara Chuchío, Zona Oeste', (SELECT id FROM distritos WHERE numero = 5), 5),
+  ('Colegio Tocomechí', 'R012', 'Comunidad Tocomechí, Zona Oeste', (SELECT id FROM distritos WHERE numero = 5), 5),
+  ('Unidad Educativa Parque Industrial', 'R013', 'Zona Parque Industrial Warnes', (SELECT id FROM distritos WHERE numero = 6), 6),
+  ('Colegio Técnico Industrial', 'R014', 'Av. Industrial, Zona PI', (SELECT id FROM distritos WHERE numero = 6), 5),
+  ('Unidad Educativa 6 de Agosto', 'R015', 'B/ 6 de Agosto, Zona Industrial', (SELECT id FROM distritos WHERE numero = 6), 5);
 
 -- Generar mesas para cada recinto
 DO $$
@@ -269,13 +255,13 @@ BEGIN
   END LOOP;
 END $$;
 
--- Partidos políticos (basados en elecciones 2021 SCZ)
+-- Partidos políticos (elecciones subnacionales Warnes 2026)
 INSERT INTO partidos (nombre, sigla, color, orden) VALUES
-  ('Unidad Cívica Solidaridad', 'UCS', '#FF6B00', 1),
-  ('Comunidad Ciudadana - Autonomía', 'C-A', '#00B4D8', 2),
-  ('Movimiento al Socialismo', 'MAS-IPSP', '#0066CC', 3),
-  ('Santa Cruz Para Todos', 'SPT', '#8B5CF6', 4),
-  ('Demócratas', 'DEM', '#059669', 5),
-  ('SOL.bo', 'SOL', '#F59E0B', 6),
-  ('Frente Para la Victoria', 'FPV', '#DC2626', 7),
-  ('Movimiento Tercer Sistema', 'MTS', '#6B7280', 8);
+  ('Movimiento al Socialismo - Instrumento Político por la Soberanía de los Pueblos', 'MAS-IPSP', '#0066CC', 1),
+  ('Creemos', 'CREEMOS', '#059669', 2),
+  ('Santa Cruz Para Todos', 'SPT', '#8B5CF6', 3),
+  ('Unidad Cívica Solidaridad', 'UCS', '#FF6B00', 4),
+  ('Acción Democrática Nacionalista', 'ADN', '#DC2626', 5),
+  ('Movimiento Tercer Sistema', 'MTS', '#6B7280', 6),
+  ('Nueva Generación Patriótica', 'NGP', '#0D9488', 7),
+  ('Partido Demócrata Cristiano', 'PDC', '#EAB308', 8);
