@@ -7,7 +7,13 @@
 -- RPC: Dashboard stats en una sola llamada
 -- ============================================
 
-CREATE OR REPLACE FUNCTION get_dashboard_data(p_distrito_id UUID DEFAULT NULL)
+-- Drop old single-param version if exists
+DROP FUNCTION IF EXISTS get_dashboard_data(UUID);
+
+CREATE OR REPLACE FUNCTION get_dashboard_data(
+  p_municipio_id UUID DEFAULT NULL,
+  p_distrito_id UUID DEFAULT NULL
+)
 RETURNS JSON
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -16,9 +22,22 @@ SET search_path = ''
 AS $$
 DECLARE
   result JSON;
+  v_distrito_ids UUID[];
 BEGIN
+  -- Resolve district IDs based on filters
+  IF p_distrito_id IS NOT NULL THEN
+    v_distrito_ids := ARRAY[p_distrito_id];
+  ELSIF p_municipio_id IS NOT NULL THEN
+    SELECT array_agg(id) INTO v_distrito_ids
+    FROM public.distritos WHERE municipio_id = p_municipio_id;
+  END IF;
+
   SELECT json_build_object(
-    'total_mesas', (SELECT count(*) FROM public.mesas),
+    'total_mesas', (
+      SELECT count(*) FROM public.mesas m
+      JOIN public.recintos r ON m.recinto_id = r.id
+      WHERE (v_distrito_ids IS NULL OR r.distrito_id = ANY(v_distrito_ids))
+    ),
     'actas', (
       SELECT json_build_object(
         'procesadas', count(*),
@@ -29,7 +48,7 @@ BEGIN
       FROM public.actas a
       JOIN public.mesas m ON a.mesa_id = m.id
       JOIN public.recintos r ON m.recinto_id = r.id
-      WHERE (p_distrito_id IS NULL OR r.distrito_id = p_distrito_id)
+      WHERE (v_distrito_ids IS NULL OR r.distrito_id = ANY(v_distrito_ids))
     ),
     'votos_partido', (
       SELECT coalesce(json_agg(row_to_json(vp.*) ORDER BY vp.orden), '[]'::json)
@@ -41,7 +60,7 @@ BEGIN
         LEFT JOIN public.actas a ON v.acta_id = a.id
         LEFT JOIN public.mesas m ON a.mesa_id = m.id
         LEFT JOIN public.recintos r ON m.recinto_id = r.id
-        WHERE (p_distrito_id IS NULL OR r.distrito_id = p_distrito_id)
+        WHERE (v_distrito_ids IS NULL OR r.distrito_id = ANY(v_distrito_ids))
         GROUP BY p.id, p.sigla, p.color, p.orden
         ORDER BY p.orden
       ) vp
@@ -55,7 +74,7 @@ BEGIN
         FROM public.actas a
         JOIN public.mesas m ON a.mesa_id = m.id
         JOIN public.recintos r ON m.recinto_id = r.id
-        WHERE (p_distrito_id IS NULL OR r.distrito_id = p_distrito_id)
+        WHERE (v_distrito_ids IS NULL OR r.distrito_id = ANY(v_distrito_ids))
         GROUP BY to_char(a.created_at AT TIME ZONE 'America/La_Paz', 'HH24:MI')
         ORDER BY hora
       ) ev
@@ -79,6 +98,7 @@ BEGIN
             ) sub ON sub.partido_id = p2.id
           ) as votos
         FROM public.distritos d
+        WHERE (v_distrito_ids IS NULL OR d.id = ANY(v_distrito_ids))
         ORDER BY d.numero
       ) pd
     ) END
@@ -89,7 +109,7 @@ END;
 $$;
 
 -- Permisos: accesible por usuarios autenticados
-GRANT EXECUTE ON FUNCTION get_dashboard_data(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_dashboard_data(UUID, UUID) TO authenticated;
 
 -- ============================================
 -- RPC: Conteo de actas por estado

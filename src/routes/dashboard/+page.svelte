@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { Chart, registerables } from 'chart.js';
-	import type { Partido, Distrito } from '$lib/types/database';
+	import type { Partido, Distrito, Municipio } from '$lib/types/database';
 
 	Chart.register(...registerables);
 
@@ -10,6 +10,8 @@
 	// Estado
 	let partidos: Partido[] = $state([]);
 	let distritos: Distrito[] = $state([]);
+	let municipios: Municipio[] = $state([]);
+	let filtroMunicipio = $state('');
 	let filtroDistrito = $state('');
 	let totalMesas = $state(0);
 	let actasProcesadas = $state(0);
@@ -33,6 +35,14 @@
 	let channel: any = null;
 	let recalculateTimer: ReturnType<typeof setTimeout> | null = null;
 
+	// Derived: current municipality object
+	let municipioActual = $derived(municipios.find(m => m.id === filtroMunicipio));
+
+	// Derived: districts filtered by selected municipality
+	let distritosFiltered = $derived(
+		filtroMunicipio ? distritos.filter(d => d.municipio_id === filtroMunicipio) : distritos
+	);
+
 	// Sanitize text for safe HTML insertion (prevent XSS)
 	function escapeHtml(text: string): string {
 		const div = document.createElement('div');
@@ -40,21 +50,44 @@
 		return div.innerHTML;
 	}
 
-	// District coordinates indexed by number — Warnes municipality
-	const coordsByNumber: Record<number, [number, number]> = {
-		1: [-17.5103, -63.1647], // Central - Warnes centro
-		2: [-17.4850, -63.1700], // Norte - Juan Latino
-		3: [-17.5380, -63.1580], // Sur - Los Chacos
-		4: [-17.5150, -63.1350], // Este - Asusaquí
-		5: [-17.5050, -63.1950], // Oeste - Clara Chuchío
-		6: [-17.5250, -63.1450]  // Industrial - Parque Industrial
+	// District coordinates by municipality
+	const MUNICIPALITY_COORDS: Record<string, Record<number, [number, number]>> = {
+		'WAR': {
+			1: [-17.5103, -63.1647], // Central - Warnes centro
+			2: [-17.4850, -63.1700], // Norte - Juan Latino
+			3: [-17.5380, -63.1580], // Sur - Los Chacos
+			4: [-17.5150, -63.1350], // Este - Asusaquí
+			5: [-17.5050, -63.1950], // Oeste - Clara Chuchío
+			6: [-17.5250, -63.1450]  // Industrial - Parque Industrial
+		},
+		'SCZ': {
+			1: [-17.7833, -63.1822],  // Casco Viejo
+			2: [-17.7650, -63.1820],  // Norte - Villa 1ro de Mayo
+			3: [-17.7700, -63.1600],  // Noreste - Pampa de la Isla
+			4: [-17.7950, -63.1500],  // Este - Plan 3000
+			5: [-17.8050, -63.1550],  // Sureste - Los Lotes
+			6: [-17.8100, -63.1800],  // Sur - El Bajío
+			7: [-17.7900, -63.2050],  // Suroeste
+			8: [-17.7700, -63.2100],  // Oeste - Equipetrol
+			9: [-17.7600, -63.1950],  // Noroeste - Urbarí
+			10: [-17.7400, -63.1750], // Norte Periurbano
+			11: [-17.7850, -63.1350], // Este Periurbano
+			12: [-17.8250, -63.1900], // Sur Periurbano
+			13: [-17.7500, -63.1200], // Paurito
+			14: [-17.7300, -63.2100], // Montero Hoyos
+			15: [-17.8400, -63.1400]  // El Palmar del Oratorio
+		}
 	};
 
 	function getDistrictCoords(distName: string): [number, number] | undefined {
+		const codigo = municipioActual?.codigo ?? 'WAR';
+		const coords = MUNICIPALITY_COORDS[codigo];
+		if (!coords) return undefined;
+
 		const distrito = distritos.find((d) => d.nombre === distName);
-		if (distrito) return coordsByNumber[distrito.numero];
+		if (distrito) return coords[distrito.numero];
 		const numMatch = distName.match(/(\d+)/);
-		if (numMatch) return coordsByNumber[parseInt(numMatch[1])];
+		if (numMatch) return coords[parseInt(numMatch[1])];
 		return undefined;
 	}
 
@@ -217,10 +250,16 @@
 		const el = mapEl;
 		if (!el) return;
 
-		// Read reactive deps so this re-runs when district data changes
+		// Read reactive deps so this re-runs when data changes
 		const distData = resultadosPorDistrito;
 		const _partidos = partidos;
 		const _distritos = distritos;
+		const muni = municipioActual;
+
+		const mapCenter: [number, number] = muni
+			? [muni.latitud, muni.longitud]
+			: [-17.5103, -63.1647];
+		const mapZoom = muni?.zoom_level ?? 13;
 
 		let mapInstance: import('leaflet').Map | null = null;
 		let active = true;
@@ -231,7 +270,7 @@
 			mapInstance = L.map(el, {
 				zoomControl: false,
 				attributionControl: false
-			}).setView([-17.5103, -63.1647], 13);
+			}).setView(mapCenter, mapZoom);
 
 			L.control.zoom({ position: 'topright' }).addTo(mapInstance);
 
@@ -307,9 +346,10 @@
 		loadError = '';
 
 		try {
-			const [partidosRes, distritosRes] = await Promise.all([
+			const [partidosRes, distritosRes, municipiosRes] = await Promise.all([
 				data.supabase.from('partidos').select('*').order('orden'),
-				data.supabase.from('distritos').select('*').order('numero')
+				data.supabase.from('distritos').select('*').order('numero'),
+				data.supabase.from('municipios').select('*').order('nombre')
 			]);
 
 			if (partidosRes.error) throw partidosRes.error;
@@ -317,6 +357,12 @@
 
 			partidos = partidosRes.data ?? [];
 			distritos = distritosRes.data ?? [];
+			municipios = municipiosRes.data ?? [];
+
+			// Default to first municipality
+			if (municipios.length > 0) {
+				filtroMunicipio = municipios[0].id;
+			}
 
 			await recalculate();
 		} catch {
@@ -328,6 +374,7 @@
 
 	async function recalculate() {
 		const { data: rpcData, error: rpcError } = await data.supabase.rpc('get_dashboard_data', {
+			p_municipio_id: filtroMunicipio || null,
 			p_distrito_id: filtroDistrito || null
 		});
 
@@ -367,10 +414,18 @@
 	}
 
 	async function recalculateLegacy() {
+		// Build district filter based on municipality
+		const municipioDistritos = filtroMunicipio
+			? distritos.filter(d => d.municipio_id === filtroMunicipio)
+			: distritos;
+		const distritoIds = filtroDistrito
+			? [filtroDistrito]
+			: municipioDistritos.map(d => d.id);
+
 		const mesasCount = await data.supabase
 			.from('mesas')
-			.select('*', { count: 'exact', head: true });
-		if (mesasCount.error) throw new Error('Error al contar mesas');
+			.select('*, recintos!inner(distrito_id)', { count: 'exact', head: true })
+			.in('recintos.distrito_id', distritoIds);
 		totalMesas = mesasCount.count ?? 0;
 
 		let actasQuery = data.supabase
@@ -382,6 +437,8 @@
 			);
 		if (filtroDistrito) {
 			actasQuery = actasQuery.eq('mesas.recintos.distrito_id', filtroDistrito);
+		} else if (distritoIds.length > 0) {
+			actasQuery = actasQuery.in('mesas.recintos.distrito_id', distritoIds);
 		}
 
 		const { data: actasData, count: actasCount, error: actasError } = await actasQuery;
@@ -424,7 +481,7 @@
 		evolucion = [...evoMap.entries()].map(([hora, actas]) => ({ hora, actas }));
 
 		const distRes: Record<string, Record<string, number>> = {};
-		for (const d of distritos) {
+		for (const d of municipioDistritos) {
 			distRes[d.nombre] = {};
 			for (const p of partidos) distRes[d.nombre][p.sigla] = 0;
 		}
@@ -484,6 +541,15 @@
 		return ((actasProcesadas / totalMesas) * 100).toFixed(1);
 	}
 
+	async function handleMunicipioChange() {
+		filtroDistrito = ''; // Reset district filter when municipality changes
+		try {
+			await recalculate();
+		} catch {
+			loadError = 'Error al cambiar municipio.';
+		}
+	}
+
 	async function handleFiltroChange() {
 		try {
 			await recalculate();
@@ -503,7 +569,7 @@
 		<div class="flex items-center justify-between">
 			<div>
 				<h1 class="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight">Panel de Resultados</h1>
-				<p class="text-[12px] sm:text-[13px] text-slate-400 mt-0.5 font-medium">Conteo rápido — Warnes</p>
+				<p class="text-[12px] sm:text-[13px] text-slate-400 mt-0.5 font-medium">Conteo rápido — {municipioActual?.nombre ?? 'Cargando'}</p>
 			</div>
 			<div class="sm:hidden flex items-center gap-2 text-[11px] font-semibold text-primary-600 bg-primary-50 border border-primary-100 px-2.5 py-1 rounded-full">
 				<span class="w-1.5 h-1.5 rounded-full bg-primary-500 live-dot"></span>
@@ -511,6 +577,18 @@
 			</div>
 		</div>
 		<div class="flex items-center gap-3">
+			{#if municipios.length > 1}
+				<select
+					bind:value={filtroMunicipio}
+					onchange={handleMunicipioChange}
+					aria-label="Seleccionar municipio"
+					class="input !w-full sm:!w-auto !py-2 !px-3 !text-[13px] !font-semibold"
+				>
+					{#each municipios as m}
+						<option value={m.id}>{m.nombre}</option>
+					{/each}
+				</select>
+			{/if}
 			<select
 				bind:value={filtroDistrito}
 				onchange={handleFiltroChange}
@@ -518,7 +596,7 @@
 				class="input !w-full sm:!w-auto !py-2 !px-3 !text-[13px]"
 			>
 				<option value="">Todos los distritos</option>
-				{#each distritos as d}
+				{#each distritosFiltered as d}
 					<option value={d.id}>{d.nombre}</option>
 				{/each}
 			</select>
@@ -674,7 +752,7 @@
 							<path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
 							<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
 						</svg>
-						<span class="text-[12px] font-medium">Warnes</span>
+						<span class="text-[12px] font-medium">{municipioActual?.nombre ?? ''}</span>
 					</div>
 				</div>
 				<div bind:this={mapEl} class="h-72 rounded-xl overflow-hidden bg-slate-50 border border-slate-100"></div>

@@ -91,7 +91,7 @@
 
 			<!-- Footer -->
 			<p class="text-primary-300/40 text-xs font-medium">
-				Elecciones Subnacionales 2026 — Warnes
+				Elecciones Subnacionales 2026 — Santa Cruz
 			</p>
 		</div>
 	</div>
@@ -168,7 +168,7 @@
 			</form>
 
 			<p class="text-center text-slate-300 text-xs mt-8 lg:hidden">
-				Elecciones Subnacionales 2026 — Warnes
+				Elecciones Subnacionales 2026 — Santa Cruz
 			</p>
 		</div>
 	</div>

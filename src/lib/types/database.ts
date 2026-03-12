@@ -8,10 +8,21 @@ export interface Partido {
 	orden: number;
 }
 
+export interface Municipio {
+	id: string;
+	nombre: string;
+	codigo: string;
+	departamento: string;
+	latitud: number;
+	longitud: number;
+	zoom_level: number;
+}
+
 export interface Distrito {
 	id: string;
 	nombre: string;
 	numero: number;
+	municipio_id?: string;
 }
 
 export interface Recinto {
